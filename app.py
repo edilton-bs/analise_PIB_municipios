@@ -107,72 +107,86 @@ st.caption("Análise econômica municipal • 2010–2023")
 if modo == "Município único":
     st.subheader(f"📌 Indicadores-chave - {municipio_sel}")
     
-    col1, col2, col3, col4, col5 = st.columns(5)
+    # Calcular KPIs usando data.py
+    kpis = calcular_kpis_municipio(df, municipio_sel, ano_ref)
+    crescimento_periodo = calcular_crescimento_periodo(df, municipio_sel, "nome_municipio", ano_intervalo[0], ano_intervalo[1])
     
-    col1.metric(
-        f"PIB Total ({ano_ref})",
-        "R$ 2,3 bi",
-        "+5,2% vs ano anterior"
-    )
+    if kpis:
+        col1, col2, col3, col4, col5 = st.columns(5)
+        
+        col1.metric(
+            f"PIB Total ({ano_ref})",
+            f"R$ {kpis['pib_total']/1000:.1f} mi" if kpis['pib_total'] < 1_000_000 else f"R$ {kpis['pib_total']/1_000_000:.1f} bi",
+            f"{kpis['crescimento_ano_anterior']:.1f}% vs ano anterior" if kpis['crescimento_ano_anterior'] else "N/A"
+        )
 
-    col2.metric(
-        f"População ({ano_ref})",
-        "70.000",
-        "+1,5% vs ano anterior"
-    )
-    
-    col3.metric(
-        f"PIB per capita ({ano_ref})",
-        "R$ 32.500",
-        "+3,1% vs ano anterior"
-    )
-    
-    col4.metric(
-        "Crescimento acumulado",
-        "68%",
-        "2010 → 2023"
-    )
-    
-    col5.metric(
-        "Participação do Setor Público",
-        "41%",
-        "Alta"
-    )
+        col2.metric(
+            f"População ({ano_ref})",
+            f"{kpis['populacao']:,.0f}".replace(",", "."),
+            None
+        )
+        
+        col3.metric(
+            f"PIB per capita ({ano_ref})",
+            f"R$ {kpis['pib_per_capita']:,.0f}".replace(",", "."),
+            None
+        )
+        
+        col4.metric(
+            "Crescimento acumulado",
+            f"{crescimento_periodo:.1f}%" if crescimento_periodo else "N/A",
+            f"{ano_intervalo[0]} → {ano_intervalo[1]}"
+        )
+        
+        col5.metric(
+            "Participação do Setor Público",
+            f"{kpis['dependencia_publica']:.1f}%",
+            kpis['setor_dominante']
+        )
+    else:
+        st.warning("Dados não disponíveis para o município selecionado.")
 
 elif modo == "Todos os municípios":
     st.subheader(f"📌 Indicadores-chave - {uf} (Todos os municípios)")
     
-    col1, col2, col3, col4, col5 = st.columns(5)
+    # Calcular KPIs usando data.py
+    kpis = calcular_kpis_uf(df, uf, ano_ref)
+    crescimento_periodo = calcular_crescimento_periodo(df, uf, "sigla_uf", ano_intervalo[0], ano_intervalo[1])
     
-    col1.metric(
-        f"PIB Total ({ano_ref})",
-        "R$ 128,5 bi",
-        "+4,5% vs ano anterior"
-    )
+    if kpis:
+        col1, col2, col3, col4, col5 = st.columns(5)
+        
+        col1.metric(
+            f"PIB Total ({ano_ref})",
+            f"R$ {kpis['pib_total']/1000:.1f} mi" if kpis['pib_total'] < 1_000_000 else f"R$ {kpis['pib_total']/1_000_000:.1f} bi",
+            f"{kpis['crescimento_ano_anterior']:.1f}% vs ano anterior" if kpis['crescimento_ano_anterior'] else "N/A"
+        )
 
-    col2.metric(
-        f"População total ({ano_ref})",
-        "8.500.000",
-        "+1,2% vs ano anterior"
-    )
-    
-    col3.metric(
-        f"PIB per capita médio ({ano_ref})",
-        "R$ 35.800",
-        "+3,2% vs ano anterior"
-    )
-    
-    col4.metric(
-        "Crescimento acumulado",
-        "71%",
-        "2010 → 2023"
-    )
-    
-    col5.metric(
-        "Número de municípios",
-        f"{len(municipios)}",
-        f"{uf}"
-    )
+        col2.metric(
+            f"População total ({ano_ref})",
+            f"{kpis['populacao_total']:,.0f}".replace(",", "."),
+            None
+        )
+        
+        col3.metric(
+            f"PIB per capita médio ({ano_ref})",
+            f"R$ {kpis['pib_per_capita_medio']:,.0f}".replace(",", "."),
+            None
+        )
+        
+        col4.metric(
+            "Crescimento acumulado",
+            f"{crescimento_periodo:.1f}%" if crescimento_periodo else "N/A",
+            f"{ano_intervalo[0]} → {ano_intervalo[1]}"
+        )
+        
+        col5.metric(
+            "Número de municípios",
+            f"{kpis['num_municipios']}",
+            f"{uf}"
+        )
+    else:
+        st.warning("Dados não disponíveis para a UF selecionada.")
 
 elif modo == "Agregado":
     # Título dinâmico baseado na seleção
@@ -183,37 +197,53 @@ elif modo == "Agregado":
     
     st.subheader(f"📌 Indicadores-chave - {titulo_contexto}")
     
-    col1, col2, col3, col4, col5 = st.columns(5)
+    # Calcular KPIs usando data.py
+    kpis = calcular_kpis_agregado(df, regiao, ano_ref)
     
-    col1.metric(
-        f"PIB Total ({ano_ref})",
-        "R$ 457,8 bi",
-        "+4,8% vs ano anterior"
-    )
+    # Calcular crescimento para região/Brasil
+    if regiao == "Brasil":
+        dados_ini = df[df["ano"] == ano_intervalo[0]]["pib_total"].sum()
+        dados_fim = df[df["ano"] == ano_intervalo[1]]["pib_total"].sum()
+    else:
+        dados_ini = df[(df["nome_grande_regiao"] == regiao) & (df["ano"] == ano_intervalo[0])]["pib_total"].sum()
+        dados_fim = df[(df["nome_grande_regiao"] == regiao) & (df["ano"] == ano_intervalo[1])]["pib_total"].sum()
+    
+    crescimento_periodo = ((dados_fim - dados_ini) / dados_ini) * 100 if dados_ini > 0 else None
+    
+    if kpis:
+        col1, col2, col3, col4, col5 = st.columns(5)
+        
+        col1.metric(
+            f"PIB Total ({ano_ref})",
+            f"R$ {kpis['pib_total']/1_000_000:.1f} bi",
+            f"{kpis['crescimento_ano_anterior']:.1f}% vs ano anterior" if kpis['crescimento_ano_anterior'] else "N/A"
+        )
 
-    col2.metric(
-        f"População total ({ano_ref})",
-        "55.000.000",
-        "+1,3% vs ano anterior"
-    )
-    
-    col3.metric(
-        f"PIB per capita médio ({ano_ref})",
-        "R$ 38.200",
-        "+3,5% vs ano anterior"
-    )
-    
-    col4.metric(
-        "Crescimento acumulado",
-        "72%",
-        "2010 → 2023"
-    )
-    
-    col5.metric(
-        "Número de municípios",
-        "5.570",
-        "Brasil"
-    )
+        col2.metric(
+            f"População total ({ano_ref})",
+            f"{kpis['populacao_total']:,.0f}".replace(",", "."),
+            None
+        )
+        
+        col3.metric(
+            f"PIB per capita médio ({ano_ref})",
+            f"R$ {kpis['pib_per_capita_medio']:,.0f}".replace(",", "."),
+            None
+        )
+        
+        col4.metric(
+            "Crescimento acumulado",
+            f"{crescimento_periodo:.1f}%" if crescimento_periodo else "N/A",
+            f"{ano_intervalo[0]} → {ano_intervalo[1]}"
+        )
+        
+        col5.metric(
+            "Número de municípios",
+            f"{kpis['num_municipios']}",
+            titulo_contexto
+        )
+    else:
+        st.warning("Dados não disponíveis para a seleção.")
 
 
 # ===============================
@@ -231,71 +261,101 @@ with col5:
     st.markdown("**Evolução do PIB ao longo do tempo**")
     
     if modo == "Município único":
-        df_line = pd.DataFrame({
-            "Ano": list(range(2010, 2024)),
-            "PIB": [i * 10 for i in range(14)]
-        })
-        
-        fig_line = px.line(
-            df_line,
-            x="Ano",
-            y="PIB",
-            markers=True
+        df_line = dados_evolucao_pib(
+            df, 
+            uf=uf,
+            municipios=[municipio_sel],
+            ano_ini=ano_intervalo[0],
+            ano_fim=ano_intervalo[1]
         )
+        
+        if not df_line.empty:
+            # Converter para milhões/bilhões
+            df_line["PIB (R$ mi)"] = df_line["pib_total"] / 1000
+            
+            fig_line = px.line(
+                df_line,
+                x="ano",
+                y="PIB (R$ mi)",
+                markers=True
+            )
+            fig_line.update_layout(xaxis_title="Ano", yaxis_title="PIB (R$ mi)")
+        else:
+            fig_line = px.line(title="Dados não disponíveis")
         
     elif modo == "Comparar municípios":
-        df_line = pd.DataFrame({
-            "Ano": list(range(2010, 2024)) * len(municipios_sel),
-            "Município": [m for m in municipios_sel for _ in range(14)],
-            "PIB": [i * 10 * (1 + idx * 0.3)
-                    for idx, m in enumerate(municipios_sel)
-                    for i in range(14)]
-        })
-        
-        fig_line = px.line(
-            df_line,
-            x="Ano",
-            y="PIB",
-            color="Município",
-            markers=True
-        )
+        if municipios_sel and len(municipios_sel) > 0:
+            df_line = dados_evolucao_pib(
+                df,
+                uf=uf,
+                municipios=municipios_sel,
+                ano_ini=ano_intervalo[0],
+                ano_fim=ano_intervalo[1]
+            )
+            
+            if not df_line.empty:
+                df_line["PIB (R$ mi)"] = df_line["pib_total"] / 1000
+                
+                fig_line = px.line(
+                    df_line,
+                    x="ano",
+                    y="PIB (R$ mi)",
+                    color="nome_municipio",
+                    markers=True
+                )
+                fig_line.update_layout(xaxis_title="Ano", yaxis_title="PIB (R$ mi)", legend_title="Município")
+            else:
+                fig_line = px.line(title="Dados não disponíveis")
+        else:
+            fig_line = px.line(title="Selecione municípios para comparar")
     
     elif modo == "Todos os municípios":
-        # Top municípios da UF (até 5)
-        top_mun = municipios[:min(5, len(municipios))]
-        n_mun = len(top_mun)
-        
-        df_line = pd.DataFrame({
-            "Ano": list(range(2010, 2024)) * n_mun,
-            "Município": [m for m in top_mun for _ in range(14)],
-            "PIB (R$ bi)": [i * 2 * (1 + idx * 0.4)
-                    for idx in range(n_mun)
-                    for i in range(14)]
-        })
-        
-        fig_line = px.line(
-            df_line,
-            x="Ano",
-            y="PIB (R$ bi)",
-            color="Município",
-            markers=True,
-            title=f"Top {n_mun} municípios por PIB"
+        # Top 5 municípios da UF
+        df_line = dados_evolucao_pib(
+            df,
+            uf=uf,
+            ano_ini=ano_intervalo[0],
+            ano_fim=ano_intervalo[1]
         )
+        
+        if not df_line.empty:
+            df_line["PIB (R$ mi)"] = df_line["pib_total"] / 1000
+            
+            fig_line = px.line(
+                df_line,
+                x="ano",
+                y="PIB (R$ mi)",
+                color="nome_municipio",
+                markers=True,
+                title=f"Top 5 municípios por PIB"
+            )
+            fig_line.update_layout(xaxis_title="Ano", yaxis_title="PIB (R$ mi)", legend_title="Município")
+        else:
+            fig_line = px.line(title="Dados não disponíveis")
         
     else:  # Modo Agregado
         # Comparação entre UFs ou regiões
-        df_line = dados_evolucao_pib(df, uf=uf, ano_ini=2010, ano_fim=2023)
-
-        # st.write(df_line)  # DEBUG
-        
-        fig_line = px.line(
-            df_line,
-            x="ano",
-            y="pib_total",
-            color="sigla_uf",
-            markers=True,
-            title="Top 5 UFs por PIB"
+        df_line = dados_evolucao_pib(
+            df,
+            regiao=regiao if uf == "Todas" else None,
+            ano_ini=ano_intervalo[0],
+            ano_fim=ano_intervalo[1]
         )
+        
+        if not df_line.empty:
+            df_line["PIB (R$ bi)"] = df_line["pib_total"] / 1_000_000
+            
+            fig_line = px.line(
+                df_line,
+                x="ano",
+                y="PIB (R$ bi)",
+                color="sigla_uf",
+                markers=True,
+                title="Top 5 UFs por PIB"
+            )
+            fig_line.update_layout(xaxis_title="Ano", yaxis_title="PIB (R$ bi)", legend_title="UF")
+        else:
+            fig_line = px.line(title="Dados não disponíveis")
     
     st.plotly_chart(fig_line, use_container_width=True)
 
@@ -303,19 +363,65 @@ with col5:
 with col6:
     st.markdown("**Estrutura do Valor Adicionado (2010–2023)**")
     
-    df_area = pd.DataFrame({
-        "Ano": list(range(2010, 2024)),
-        "Agropecuária": [10]*14,
-        "Indústria": [20]*14,
-        "Serviços": [40]*14,
-        "Administração Pública": [30]*14
-    })
+    if modo == "Município único":
+        df_area = dados_evolucao_valor_adicionado(
+            df,
+            municipio=municipio_sel,
+            ano_ini=ano_intervalo[0],
+            ano_fim=ano_intervalo[1]
+        )
+    elif modo == "Comparar municípios" and municipios_sel and len(municipios_sel) > 0:
+        # Agregar todos os municípios selecionados
+        df_area = dados_evolucao_valor_adicionado(
+            df,
+            uf=uf,
+            ano_ini=ano_intervalo[0],
+            ano_fim=ano_intervalo[1]
+        )
+        # Filtrar pelos municípios selecionados
+        df_temp = df[(df["sigla_uf"] == uf) & (df["nome_municipio"].isin(municipios_sel))]
+        df_area = df_temp.groupby("ano").agg({
+            "vab_agropecuaria": "sum",
+            "vab_industria": "sum",
+            "vab_servicos": "sum",
+            "vab_adm_defesa_educacao_saude": "sum"
+        }).reset_index()
+        df_area = df_area.rename(columns={
+            "vab_agropecuaria": "Agropecuária",
+            "vab_industria": "Indústria",
+            "vab_servicos": "Serviços",
+            "vab_adm_defesa_educacao_saude": "Administração Pública"
+        })
+    elif modo == "Todos os municípios":
+        df_area = dados_evolucao_valor_adicionado(
+            df,
+            uf=uf,
+            ano_ini=ano_intervalo[0],
+            ano_fim=ano_intervalo[1]
+        )
+    else:  # Agregado
+        df_area = dados_evolucao_valor_adicionado(
+            df,
+            regiao=regiao if uf == "Todas" else None,
+            uf=uf if uf != "Todas" else None,
+            ano_ini=ano_intervalo[0],
+            ano_fim=ano_intervalo[1]
+        )
     
-    fig_area = px.area(
-        df_area,
-        x="Ano",
-        y=df_area.columns[1:]
-    )
+    if df_area is not None and not df_area.empty:
+        # Converter para bilhões para visualização
+        for col in ["Agropecuária", "Indústria", "Serviços", "Administração Pública"]:
+            if col in df_area.columns:
+                df_area[col] = df_area[col] / 1000  # Milhares -> Milhões
+        
+        fig_area = px.area(
+            df_area,
+            x="ano",
+            y=["Agropecuária", "Indústria", "Serviços", "Administração Pública"]
+        )
+        fig_area.update_layout(xaxis_title="Ano", yaxis_title="Valor Adicionado (R$ mi)", legend_title="Setor")
+    else:
+        fig_area = px.area(title="Dados não disponíveis")
     
     st.plotly_chart(fig_area, use_container_width=True)
 
@@ -331,19 +437,18 @@ if modo == "Município único":
     col7, col8 = st.columns(2)
     
     with col7:
-        df_donut = pd.DataFrame({
-            "Setor": ["Agropecuária", "Indústria", "Serviços", "Administração Pública"],
-            "Participação (%)": [10, 20, 40, 30]
-        })
+        df_donut = composicao_setorial_municipio(df, municipio_sel, ano_ref)
         
-        fig_donut = px.pie(
-            df_donut,
-            names="Setor",
-            values="Participação (%)",
-            hole=0.5
-        )
-        
-        st.plotly_chart(fig_donut, use_container_width=True)
+        if df_donut is not None and not df_donut.empty:
+            fig_donut = px.pie(
+                df_donut,
+                names="Setor",
+                values="Participação (%)",
+                hole=0.5
+            )
+            st.plotly_chart(fig_donut, use_container_width=True)
+        else:
+            st.warning("Dados de composição não disponíveis")
     
     with col8:
         st.markdown("### 🧠 Escala econômica vs renda")
@@ -352,23 +457,22 @@ if modo == "Município único":
             "avaliando relação entre tamanho da economia, renda média e dependência pública."
         )
         
-        df_scatter = pd.DataFrame({
-            "Município": municipios,
-            "PIB Total": [1000, 2000, 1500, 2500],
-            "PIB per capita": [28000, 32000, 30000, 35000],
-            "Dependência Pública (%)": [30, 45, 40, 25]
-        })
+        df_scatter = scatter_pib_vs_per_capita(df, uf, ano_ref)
         
-        fig_scatter = px.scatter(
-            df_scatter,
-            x="PIB Total",
-            y="PIB per capita",
-            size="Dependência Pública (%)",
-            color="Município",
-            size_max=40
-        )
-        
-        st.plotly_chart(fig_scatter, use_container_width=True)
+        if df_scatter is not None and not df_scatter.empty:
+            fig_scatter = px.scatter(
+                df_scatter,
+                x="PIB Total (R$ mi)",
+                y="PIB per capita (R$)",
+                size="Dependência Pública (%)",
+                hover_data=["Município"],
+                text="Município",
+                size_max=40
+            )
+            fig_scatter.update_traces(textposition='top center', textfont_size=8)
+            st.plotly_chart(fig_scatter, use_container_width=True)
+        else:
+            st.warning("Dados de scatter não disponíveis")
 
 
 # ===============================
@@ -383,39 +487,42 @@ if modo == "Todos os municípios":
     
     with col_todos1:
         st.markdown("**Ranking: PIB Total**")
-        df_ranking_mun = pd.DataFrame({
-            "Município": municipios,
-            "PIB Total (R$ mi)": [2500, 1800, 1500, 1200]
-        }).sort_values("PIB Total (R$ mi)", ascending=True)
+        df_ranking_mun = ranking_municipios_pib(df, uf, ano_ref, top_n=10)
         
-        fig_ranking_mun = px.bar(
-            df_ranking_mun,
-            y="Município",
-            x="PIB Total (R$ mi)",
-            orientation='h',
-            text_auto=True
-        )
-        
-        st.plotly_chart(fig_ranking_mun, use_container_width=True)
+        if df_ranking_mun is not None and not df_ranking_mun.empty:
+            # Preparar para visualização horizontal (inverter para mostrar maior no topo)
+            df_ranking_mun_sorted = df_ranking_mun.sort_values("PIB Total (R$ mi)", ascending=True)
+            
+            fig_ranking_mun = px.bar(
+                df_ranking_mun_sorted,
+                y="Município",
+                x="PIB Total (R$ mi)",
+                orientation='h',
+                text_auto='.1f'
+            )
+            st.plotly_chart(fig_ranking_mun, use_container_width=True)
+        else:
+            st.warning("Dados de ranking não disponíveis")
     
     with col_todos2:
         st.markdown("**Ranking: PIB per capita**")
-        df_ranking_pc = pd.DataFrame({
-            "Município": municipios,
-            "PIB per capita (R$)": [45000, 38000, 32000, 28000]
-        }).sort_values("PIB per capita (R$)", ascending=True)
+        df_ranking_pc = ranking_municipios_per_capita(df, uf, ano_ref, top_n=10)
         
-        fig_ranking_pc = px.bar(
-            df_ranking_pc,
-            y="Município",
-            x="PIB per capita (R$)",
-            orientation='h',
-            text_auto=True,
-            color="PIB per capita (R$)",
-            color_continuous_scale="Viridis"
-        )
-        
-        st.plotly_chart(fig_ranking_pc, use_container_width=True)
+        if df_ranking_pc is not None and not df_ranking_pc.empty:
+            df_ranking_pc_sorted = df_ranking_pc.sort_values("PIB per capita (R$)", ascending=True)
+            
+            fig_ranking_pc = px.bar(
+                df_ranking_pc_sorted,
+                y="Município",
+                x="PIB per capita (R$)",
+                orientation='h',
+                text_auto='.0f',
+                color="PIB per capita (R$)",
+                color_continuous_scale="Viridis"
+            )
+            st.plotly_chart(fig_ranking_pc, use_container_width=True)
+        else:
+            st.warning("Dados de ranking não disponíveis")
     
     # Distribuição e análise
     st.markdown("---")
@@ -423,103 +530,113 @@ if modo == "Todos os municípios":
     
     with col_dist1:
         st.markdown("**Distribuição setorial média**")
-        df_setores_uf = pd.DataFrame({
-            "Setor": ["Agropecuária", "Indústria", "Serviços", "Administração Pública"],
-            "Participação (%)": [12, 25, 42, 21]
-        })
+        df_setores_uf = composicao_setorial_uf(df, uf, ano_ref)
         
-        fig_setores_uf = px.pie(
-            df_setores_uf,
-            names="Setor",
-            values="Participação (%)",
-            hole=0.5
-        )
-        
-        st.plotly_chart(fig_setores_uf, use_container_width=True)
+        if df_setores_uf is not None and not df_setores_uf.empty:
+            fig_setores_uf = px.pie(
+                df_setores_uf,
+                names="Setor",
+                values="Participação (%)",
+                hole=0.5
+            )
+            st.plotly_chart(fig_setores_uf, use_container_width=True)
+        else:
+            st.warning("Dados setoriais não disponíveis")
     
     with col_dist2:
         st.markdown("**Distribuição do PIB per capita**")
-        df_hist = pd.DataFrame({
-            "PIB per capita (R$)": [25000, 28000, 32000, 35000, 38000, 42000, 45000, 48000]
-        })
+        # Obter dados de PIB per capita de todos os municípios da UF
+        dados_uf = df[(df["sigla_uf"] == uf) & (df["ano"] == ano_ref)]
         
-        fig_hist = px.histogram(
-            df_hist,
-            x="PIB per capita (R$)",
-            nbins=10,
-            title="Frequência"
-        )
-        
-        st.plotly_chart(fig_hist, use_container_width=True)
+        if not dados_uf.empty:
+            fig_hist = px.histogram(
+                dados_uf,
+                x="pib_per_capita",
+                nbins=20,
+                title="Frequência",
+                labels={"pib_per_capita": "PIB per capita (R$)"}
+            )
+            fig_hist.update_layout(yaxis_title="Número de municípios")
+            st.plotly_chart(fig_hist, use_container_width=True)
+        else:
+            st.warning("Dados de distribuição não disponíveis")
     
     # Tabela detalhada
     st.markdown("**📋 Tabela Detalhada - Municípios de {} ({} municípios)**".format(uf, len(municipios)))
-    df_table_todos = pd.DataFrame({
-        "Município": municipios,
-        "PIB Total (R$ mi)": [2500, 1800, 1500, 1200],
-        "PIB per capita (R$)": [45000, 38000, 32000, 28000],
-        "Dependência Pública (%)": [28, 35, 42, 38],
-        "Crescimento 2010–2023": ["75%", "68%", "72%", "65%"],
-        "Setor Dominante": ["Serviços", "Indústria", "Serviços", "Administração Pública"],
-        "População": ["850K", "420K", "320K", "280K"]
-    })
+    df_table_todos = tabela_municipios_completa(df, uf, ano_ref, ano_intervalo[0])
     
-    st.dataframe(df_table_todos, use_container_width=True)
+    if df_table_todos is not None and not df_table_todos.empty:
+        st.dataframe(df_table_todos, use_container_width=True)
+    else:
+        st.warning("Tabela detalhada não disponível")
 
 
 # ===============================
 # COMPARAÇÃO ENTRE MUNICÍPIOS
 # ===============================
-if modo == "Comparar municípios" and len(municipios_sel) > 1:
+if modo == "Comparar municípios" and municipios_sel and len(municipios_sel) > 1:
     st.markdown("---")
     st.subheader("🔍 Comparação Direta entre Municípios")
     st.caption("Análise lado a lado dos municípios selecionados para identificar diferenças e padrões")
     
     col9, col10 = st.columns(2)
     
+    # Obter dados dos municípios selecionados
+    dados_comparacao = df[(df["sigla_uf"] == uf) & (df["nome_municipio"].isin(municipios_sel)) & (df["ano"] == ano_ref)]
+    
     with col9:
         st.markdown("**PIB Total**")
-        df_bar_pib = pd.DataFrame({
-            "Município": municipios_sel,
-            "PIB Total (R$ mi)": [1000 + i*600 for i in range(len(municipios_sel))]
-        })
-        
-        fig_bar = px.bar(
-            df_bar_pib,
-            x="Município",
-            y="PIB Total (R$ mi)",
-            text_auto=True
-        )
-        
-        st.plotly_chart(fig_bar, use_container_width=True)
+        if not dados_comparacao.empty:
+            df_bar_pib = dados_comparacao[["nome_municipio", "pib_total"]].copy()
+            df_bar_pib["PIB Total (R$ mi)"] = df_bar_pib["pib_total"] / 1000
+            
+            fig_bar = px.bar(
+                df_bar_pib,
+                x="nome_municipio",
+                y="PIB Total (R$ mi)",
+                text_auto='.1f',
+                labels={"nome_municipio": "Município"}
+            )
+            st.plotly_chart(fig_bar, use_container_width=True)
+        else:
+            st.warning("Dados não disponíveis")
     
     with col10:
         st.markdown("**PIB per capita**")
-        df_bar_pc = pd.DataFrame({
-            "Município": municipios_sel,
-            "PIB per capita (R$)": [25000 + i*5000 for i in range(len(municipios_sel))]
-        })
-        
-        fig_bar_pc = px.bar(
-            df_bar_pc,
-            x="Município",
-            y="PIB per capita (R$)",
-            text_auto=True
-        )
-        
-        st.plotly_chart(fig_bar_pc, use_container_width=True)
+        if not dados_comparacao.empty:
+            fig_bar_pc = px.bar(
+                dados_comparacao,
+                x="nome_municipio",
+                y="pib_per_capita",
+                text_auto='.0f',
+                labels={"nome_municipio": "Município", "pib_per_capita": "PIB per capita (R$)"}
+            )
+            st.plotly_chart(fig_bar_pc, use_container_width=True)
+        else:
+            st.warning("Dados não disponíveis")
     
     st.markdown("**Tabela Comparativa Consolidada**")
-    df_table = pd.DataFrame({
-        "Município": municipios_sel,
-        "PIB Total (R$ mi)": [1000 + i*600 for i in range(len(municipios_sel))],
-        "PIB per capita (R$)": [25000 + i*5000 for i in range(len(municipios_sel))],
-        "Dependência Pública (%)": [35 + i*5 for i in range(len(municipios_sel))],
-        "Crescimento 2010–2023": [f"{60 + i*8}%" for i in range(len(municipios_sel))],
-        "Setor Dominante": ["Serviços", "Indústria", "Administração Pública", "Agropecuária"][:len(municipios_sel)]
-    })
-    
-    st.dataframe(df_table, use_container_width=True)
+    if not dados_comparacao.empty:
+        # Calcular métricas para tabela
+        tabela_comp = []
+        for _, row in dados_comparacao.iterrows():
+            municipio = row["nome_municipio"]
+            crescimento = calcular_crescimento_periodo(df, municipio, "nome_municipio", ano_intervalo[0], ano_intervalo[1])
+            dependencia = (row["vab_adm_defesa_educacao_saude"] / row["vab_total"]) * 100 if row["vab_total"] > 0 else 0
+            
+            tabela_comp.append({
+                "Município": municipio,
+                "PIB Total (R$ mi)": row["pib_total"] / 1000,
+                "PIB per capita (R$)": row["pib_per_capita"],
+                "Dependência Pública (%)": dependencia,
+                f"Crescimento {ano_intervalo[0]}–{ano_intervalo[1]}": f"{crescimento:.1f}%" if crescimento else "N/A",
+                "Setor Dominante": row["atividade_maior_vab"]
+            })
+        
+        df_table = pd.DataFrame(tabela_comp)
+        st.dataframe(df_table, use_container_width=True)
+    else:
+        st.warning("Tabela não disponível")
 
 
 # ===============================
@@ -535,63 +652,63 @@ if modo == "Agregado":
     
     with col11:
         st.markdown("**Ranking de PIB por UF**")
-        df_ranking = pd.DataFrame({
-            "UF": lista_ufs,
-            "PIB Total (R$ bi)": [450, 380, 320, 280, 250, 220, 190, 160, 140]
-        }).sort_values("PIB Total (R$ bi)", ascending=True)
+        df_ranking = ranking_ufs(df, ano_ref, regiao if uf == "Todas" else None)
         
-        fig_ranking = px.bar(
-            df_ranking,
-            y="UF",
-            x="PIB Total (R$ bi)",
-            orientation='h',
-            text_auto=True
-        )
-        
-        st.plotly_chart(fig_ranking, use_container_width=True)
+        if df_ranking is not None and not df_ranking.empty:
+            df_ranking_sorted = df_ranking.sort_values("PIB Total (R$ bi)", ascending=True)
+            
+            fig_ranking = px.bar(
+                df_ranking_sorted,
+                y="UF",
+                x="PIB Total (R$ bi)",
+                orientation='h',
+                text_auto='.1f'
+            )
+            st.plotly_chart(fig_ranking, use_container_width=True)
+        else:
+            st.warning("Dados de ranking não disponíveis")
     
     with col12:
         st.markdown("**PIB per capita por UF**")
-        df_per_capita = pd.DataFrame({
-            "UF": lista_ufs,
-            "PIB per capita (R$)": [52000, 48000, 42000, 38000, 35000, 33000, 31000, 28000, 25000]
-        }).sort_values("PIB per capita (R$)", ascending=True)
+        df_per_capita = ranking_ufs_per_capita(df, ano_ref, regiao if uf == "Todas" else None)
         
-        fig_per_capita = px.bar(
-            df_per_capita,
-            y="UF",
-            x="PIB per capita (R$)",
-            orientation='h',
-            text_auto=True,
-            color="PIB per capita (R$)",
-            color_continuous_scale="Blues"
-        )
-        
-        st.plotly_chart(fig_per_capita, use_container_width=True)
+        if df_per_capita is not None and not df_per_capita.empty:
+            df_per_capita_sorted = df_per_capita.sort_values("PIB per capita (R$)", ascending=True)
+            
+            fig_per_capita = px.bar(
+                df_per_capita_sorted,
+                y="UF",
+                x="PIB per capita (R$)",
+                orientation='h',
+                text_auto='.0f',
+                color="PIB per capita (R$)",
+                color_continuous_scale="Blues"
+            )
+            st.plotly_chart(fig_per_capita, use_container_width=True)
+        else:
+            st.warning("Dados de PIB per capita não disponíveis")
     
     # Bloco Principal 2: Análise de Relação (Scatter)
     st.markdown("---")
     st.markdown("**📊 Relação: Tamanho da Economia vs Renda Média**")
     st.caption("Cada ponto representa uma UF. Tamanho indica número de municípios.")
     
-    df_scatter_ufs = pd.DataFrame({
-        "UF": lista_ufs,
-        "PIB Total (R$ bi)": [450, 380, 320, 280, 250, 220, 190, 160, 140],
-        "PIB per capita (R$)": [52000, 48000, 42000, 38000, 35000, 33000, 31000, 28000, 25000],
-        "Nº Municípios": [645, 92, 853, 417, 497, 399, 295, 185, 184]
-    })
+    df_scatter_ufs = scatter_ufs_pib_vs_per_capita(df, ano_ref, regiao if uf == "Todas" else None)
     
-    fig_scatter_ufs = px.scatter(
-        df_scatter_ufs,
-        x="PIB Total (R$ bi)",
-        y="PIB per capita (R$)",
-        size="Nº Municípios",
-        color="UF",
-        text="UF",
-        size_max=50
-    )
-    fig_scatter_ufs.update_traces(textposition='top center')
-    st.plotly_chart(fig_scatter_ufs, use_container_width=True)
+    if df_scatter_ufs is not None and not df_scatter_ufs.empty:
+        fig_scatter_ufs = px.scatter(
+            df_scatter_ufs,
+            x="PIB Total (R$ bi)",
+            y="PIB per capita (R$)",
+            size="Nº Municípios",
+            hover_data=["UF"],
+            text="UF",
+            size_max=50
+        )
+        fig_scatter_ufs.update_traces(textposition='top center')
+        st.plotly_chart(fig_scatter_ufs, use_container_width=True)
+    else:
+        st.warning("Dados de scatter não disponíveis")
     
     # Análises Avançadas (em Tabs)
     st.markdown("---")
@@ -599,54 +716,59 @@ if modo == "Agregado":
     
     with tab1:
         st.markdown("**Dados Consolidados por UF**")
-        df_table_ufs = pd.DataFrame({
-            "UF": lista_ufs,
-            "PIB Total (R$ bi)": [450, 380, 320, 280, 250, 220, 190, 160, 140],
-            "PIB per capita (R$)": [52000, 48000, 42000, 38000, 35000, 33000, 31000, 28000, 25000],
-            "Crescimento 2010–2023": ["78%", "72%", "68%", "65%", "70%", "73%", "69%", "64%", "62%"],
-            "Setor Dominante": ["Serviços", "Serviços", "Indústria", "Serviços", "Agropecuária", 
-                                "Serviços", "Indústria", "Serviços", "Adm. Pública"],
-            "Nº Municípios": [645, 92, 853, 417, 497, 399, 295, 185, 184]
-        })
+        df_table_ufs = tabela_ufs_completa(df, ano_ref, ano_intervalo[0], regiao if uf == "Todas" else None)
         
-        st.dataframe(df_table_ufs, use_container_width=True)
+        if df_table_ufs is not None and not df_table_ufs.empty:
+            st.dataframe(df_table_ufs, use_container_width=True)
+        else:
+            st.warning("Tabela não disponível")
     
     with tab2:
         col_tab1, col_tab2 = st.columns(2)
         
         with col_tab1:
             st.markdown("**Distribuição setorial média**")
-            df_setores_agg = pd.DataFrame({
-                "Setor": ["Agropecuária", "Indústria", "Serviços", "Administração Pública"],
-                "Participação (%)": [8, 22, 48, 22]
-            })
+            df_setores_agg = composicao_setorial_agregado(df, regiao, ano_ref)
             
-            fig_setores = px.pie(
-                df_setores_agg,
-                names="Setor",
-                values="Participação (%)",
-                hole=0.5
-            )
-            
-            st.plotly_chart(fig_setores, use_container_width=True)
+            if df_setores_agg is not None and not df_setores_agg.empty:
+                fig_setores = px.pie(
+                    df_setores_agg,
+                    names="Setor",
+                    values="Participação (%)",
+                    hole=0.5
+                )
+                st.plotly_chart(fig_setores, use_container_width=True)
+            else:
+                st.warning("Dados setoriais não disponíveis")
         
         with col_tab2:
             st.markdown("**Participação setorial por UF**")
-            df_stacked = pd.DataFrame({
-                "UF": lista_ufs[:5] * 4,
-                "Setor": ["Agropecuária"]*5 + ["Indústria"]*5 + ["Serviços"]*5 + ["Adm. Pública"]*5,
-                "Valor (%)": [5, 8, 12, 15, 7, 25, 22, 18, 20, 23, 50, 48, 45, 42, 47, 20, 22, 25, 23, 23]
-            })
+            # Obter composição setorial de cada UF
+            if regiao == "Brasil":
+                ufs_para_mostrar = df[df["ano"] == ano_ref]["sigla_uf"].unique()[:10]  # Top 10
+            else:
+                ufs_para_mostrar = df[(df["nome_grande_regiao"] == regiao) & (df["ano"] == ano_ref)]["sigla_uf"].unique()
             
-            fig_stacked = px.bar(
-                df_stacked,
-                x="UF",
-                y="Valor (%)",
-                color="Setor",
-                text_auto=True
-            )
+            composicoes_ufs = []
+            for uf_item in ufs_para_mostrar:
+                comp = composicao_setorial_uf(df, uf_item, ano_ref)
+                if comp is not None and not comp.empty:
+                    comp["UF"] = uf_item
+                    composicoes_ufs.append(comp)
             
-            st.plotly_chart(fig_stacked, use_container_width=True)
+            if composicoes_ufs:
+                df_stacked = pd.concat(composicoes_ufs, ignore_index=True)
+                
+                fig_stacked = px.bar(
+                    df_stacked,
+                    x="UF",
+                    y="Participação (%)",
+                    color="Setor",
+                    text_auto='.1f'
+                )
+                st.plotly_chart(fig_stacked, use_container_width=True)
+            else:
+                st.warning("Dados setoriais por UF não disponíveis")
 
 
 # ===============================
