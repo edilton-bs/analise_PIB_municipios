@@ -110,27 +110,33 @@ st.caption("Análise econômica municipal • 2010–2023")
 if modo == "Município único":
     st.subheader(f"📌 Indicadores-chave - {municipio_sel}")
     
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     
     col1.metric(
         f"PIB Total ({ano_ref})",
         "R$ 2,3 bi",
         "+5,2% vs ano anterior"
     )
-    
+
     col2.metric(
+        f"População ({ano_ref})",
+        "70.000",
+        "+1,5% vs ano anterior"
+    )
+    
+    col3.metric(
         f"PIB per capita ({ano_ref})",
         "R$ 32.500",
         "+3,1% vs ano anterior"
     )
     
-    col3.metric(
+    col4.metric(
         "Crescimento acumulado",
         "68%",
         "2010 → 2023"
     )
     
-    col4.metric(
+    col5.metric(
         "Participação do Setor Público",
         "41%",
         "Alta"
@@ -139,27 +145,33 @@ if modo == "Município único":
 elif modo == "Todos os municípios":
     st.subheader(f"📌 Indicadores-chave - {uf} (Todos os municípios)")
     
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     
     col1.metric(
         f"PIB Total ({ano_ref})",
         "R$ 128,5 bi",
         "+4,5% vs ano anterior"
     )
-    
+
     col2.metric(
+        f"População total ({ano_ref})",
+        "8.500.000",
+        "+1,2% vs ano anterior"
+    )
+    
+    col3.metric(
         f"PIB per capita médio ({ano_ref})",
         "R$ 35.800",
         "+3,2% vs ano anterior"
     )
     
-    col3.metric(
+    col4.metric(
         "Crescimento acumulado",
         "71%",
         "2010 → 2023"
     )
     
-    col4.metric(
+    col5.metric(
         "Número de municípios",
         f"{len(municipios)}",
         f"{uf}"
@@ -174,27 +186,33 @@ elif modo == "Agregado":
     
     st.subheader(f"📌 Indicadores-chave - {titulo_contexto}")
     
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     
     col1.metric(
         f"PIB Total ({ano_ref})",
         "R$ 457,8 bi",
         "+4,8% vs ano anterior"
     )
-    
+
     col2.metric(
+        f"População total ({ano_ref})",
+        "55.000.000",
+        "+1,3% vs ano anterior"
+    )
+    
+    col3.metric(
         f"PIB per capita médio ({ano_ref})",
         "R$ 38.200",
         "+3,5% vs ano anterior"
     )
     
-    col3.metric(
+    col4.metric(
         "Crescimento acumulado",
         "72%",
         "2010 → 2023"
     )
     
-    col4.metric(
+    col5.metric(
         "Número de municípios",
         "5.570",
         "Brasil"
