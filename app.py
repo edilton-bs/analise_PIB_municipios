@@ -206,6 +206,7 @@ elif modo == "Agregado":
 # ===============================
 st.markdown("---")
 st.subheader("📊 Evolução Econômica")
+st.caption("Variação do PIB ao longo do tempo, ajustada ao nível de agregação selecionado")
 
 
 col5, col6 = st.columns(2)
@@ -314,6 +315,7 @@ with col6:
 if modo == "Município único":
     st.markdown("---")
     st.subheader(f"🧩 Composição do PIB — {ano_ref}")
+    st.caption("Estrutura setorial e posicionamento relativo do município")
     
     col7, col8 = st.columns(2)
     
@@ -334,6 +336,10 @@ if modo == "Município único":
     
     with col8:
         st.markdown("### 🧠 Escala econômica vs renda")
+        st.caption(
+            "Comparação do município selecionado com outros municípios da mesma UF, "
+            "avaliando relação entre tamanho da economia, renda média e dependência pública."
+        )
         
         df_scatter = pd.DataFrame({
             "Município": municipios,
@@ -360,6 +366,7 @@ if modo == "Município único":
 if modo == "Todos os municípios":
     st.markdown("---")
     st.subheader(f"🏙️ Análise dos Municípios de {uf}")
+    st.caption("Rankings, distribuições e indicadores detalhados dos municípios da UF selecionada")
     
     col_todos1, col_todos2 = st.columns(2)
     
@@ -455,6 +462,7 @@ if modo == "Todos os municípios":
 if modo == "Comparar municípios" and len(municipios_sel) > 1:
     st.markdown("---")
     st.subheader("🔍 Comparação Direta entre Municípios")
+    st.caption("Análise lado a lado dos municípios selecionados para identificar diferenças e padrões")
     
     col9, col10 = st.columns(2)
     
@@ -509,7 +517,9 @@ if modo == "Comparar municípios" and len(municipios_sel) > 1:
 if modo == "Agregado":
     st.markdown("---")
     st.subheader(f"🗺️ Análise Comparativa entre UFs — {ano_ref}")
+    st.caption("Visão panorâmica da distribuição econômica regional e setorial")
     
+    # Bloco Principal 1: Rankings
     col11, col12 = st.columns(2)
     
     with col11:
@@ -548,60 +558,84 @@ if modo == "Agregado":
         
         st.plotly_chart(fig_per_capita, use_container_width=True)
     
-    # Composição setorial agregada
+    # Bloco Principal 2: Análise de Relação (Scatter)
     st.markdown("---")
-    st.subheader("🧩 Composição Setorial Comparativa")
+    st.markdown("**📊 Relação: Tamanho da Economia vs Renda Média**")
+    st.caption("Cada ponto representa uma UF. Tamanho indica número de municípios.")
     
-    col13, col14 = st.columns(2)
-    
-    with col13:
-        st.markdown("**Distribuição setorial média**")
-        df_setores_agg = pd.DataFrame({
-            "Setor": ["Agropecuária", "Indústria", "Serviços", "Administração Pública"],
-            "Participação (%)": [8, 22, 48, 22]
-        })
-        
-        fig_setores = px.pie(
-            df_setores_agg,
-            names="Setor",
-            values="Participação (%)",
-            hole=0.5
-        )
-        
-        st.plotly_chart(fig_setores, use_container_width=True)
-    
-    with col14:
-        st.markdown("**Participação setorial por UF**")
-        df_stacked = pd.DataFrame({
-            "UF": lista_ufs[:5] * 4,
-            "Setor": ["Agropecuária"]*5 + ["Indústria"]*5 + ["Serviços"]*5 + ["Adm. Pública"]*5,
-            "Valor (%)": [5, 8, 12, 15, 7, 25, 22, 18, 20, 23, 50, 48, 45, 42, 47, 20, 22, 25, 23, 23]
-        })
-        
-        fig_stacked = px.bar(
-            df_stacked,
-            x="UF",
-            y="Valor (%)",
-            color="Setor",
-            text_auto=True
-        )
-        
-        st.plotly_chart(fig_stacked, use_container_width=True)
-    
-    # Tabela consolidada de UFs
-    st.markdown("---")
-    st.markdown("**📋 Tabela Consolidada - Principais UFs**")
-    df_table_ufs = pd.DataFrame({
+    df_scatter_ufs = pd.DataFrame({
         "UF": lista_ufs,
         "PIB Total (R$ bi)": [450, 380, 320, 280, 250, 220, 190, 160, 140],
         "PIB per capita (R$)": [52000, 48000, 42000, 38000, 35000, 33000, 31000, 28000, 25000],
-        "Crescimento 2010–2023": ["78%", "72%", "68%", "65%", "70%", "73%", "69%", "64%", "62%"],
-        "Setor Dominante": ["Serviços", "Serviços", "Indústria", "Serviços", "Agropecuária", 
-                            "Serviços", "Indústria", "Serviços", "Adm. Pública"],
         "Nº Municípios": [645, 92, 853, 417, 497, 399, 295, 185, 184]
     })
     
-    st.dataframe(df_table_ufs, use_container_width=True)
+    fig_scatter_ufs = px.scatter(
+        df_scatter_ufs,
+        x="PIB Total (R$ bi)",
+        y="PIB per capita (R$)",
+        size="Nº Municípios",
+        color="UF",
+        text="UF",
+        size_max=50
+    )
+    fig_scatter_ufs.update_traces(textposition='top center')
+    st.plotly_chart(fig_scatter_ufs, use_container_width=True)
+    
+    # Análises Avançadas (em Tabs)
+    st.markdown("---")
+    tab1, tab2 = st.tabs(["📋 Tabela Detalhada", "🧩 Composição Setorial"])
+    
+    with tab1:
+        st.markdown("**Dados Consolidados por UF**")
+        df_table_ufs = pd.DataFrame({
+            "UF": lista_ufs,
+            "PIB Total (R$ bi)": [450, 380, 320, 280, 250, 220, 190, 160, 140],
+            "PIB per capita (R$)": [52000, 48000, 42000, 38000, 35000, 33000, 31000, 28000, 25000],
+            "Crescimento 2010–2023": ["78%", "72%", "68%", "65%", "70%", "73%", "69%", "64%", "62%"],
+            "Setor Dominante": ["Serviços", "Serviços", "Indústria", "Serviços", "Agropecuária", 
+                                "Serviços", "Indústria", "Serviços", "Adm. Pública"],
+            "Nº Municípios": [645, 92, 853, 417, 497, 399, 295, 185, 184]
+        })
+        
+        st.dataframe(df_table_ufs, use_container_width=True)
+    
+    with tab2:
+        col_tab1, col_tab2 = st.columns(2)
+        
+        with col_tab1:
+            st.markdown("**Distribuição setorial média**")
+            df_setores_agg = pd.DataFrame({
+                "Setor": ["Agropecuária", "Indústria", "Serviços", "Administração Pública"],
+                "Participação (%)": [8, 22, 48, 22]
+            })
+            
+            fig_setores = px.pie(
+                df_setores_agg,
+                names="Setor",
+                values="Participação (%)",
+                hole=0.5
+            )
+            
+            st.plotly_chart(fig_setores, use_container_width=True)
+        
+        with col_tab2:
+            st.markdown("**Participação setorial por UF**")
+            df_stacked = pd.DataFrame({
+                "UF": lista_ufs[:5] * 4,
+                "Setor": ["Agropecuária"]*5 + ["Indústria"]*5 + ["Serviços"]*5 + ["Adm. Pública"]*5,
+                "Valor (%)": [5, 8, 12, 15, 7, 25, 22, 18, 20, 23, 50, 48, 45, 42, 47, 20, 22, 25, 23, 23]
+            })
+            
+            fig_stacked = px.bar(
+                df_stacked,
+                x="UF",
+                y="Valor (%)",
+                color="Setor",
+                text_auto=True
+            )
+            
+            st.plotly_chart(fig_stacked, use_container_width=True)
 
 
 # ===============================
