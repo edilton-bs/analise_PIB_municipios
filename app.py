@@ -1,6 +1,15 @@
 import streamlit as st
 import plotly.express as px
 import pandas as pd
+from data import (
+    load_data, filtrar_dados, obter_lista_municipios, obter_lista_ufs,
+    calcular_kpis_municipio, calcular_kpis_uf, calcular_kpis_agregado, calcular_crescimento_periodo,
+    dados_evolucao_pib, dados_evolucao_valor_adicionado,
+    ranking_municipios_pib, ranking_municipios_per_capita, ranking_ufs, ranking_ufs_per_capita,
+    composicao_setorial_municipio, composicao_setorial_uf, composicao_setorial_agregado,
+    scatter_pib_vs_per_capita, scatter_ufs_pib_vs_per_capita,
+    tabela_municipios_completa, tabela_ufs_completa
+)
 
 
 # ===============================
@@ -11,6 +20,12 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+
+# ===============================
+# CARREGAR DADOS
+# ===============================
+df = load_data()
 
 
 # ===============================
@@ -38,38 +53,18 @@ regiao = st.sidebar.selectbox(
     ["Brasil", "Norte", "Nordeste", "Sudeste", "Sul", "Centro-Oeste"]
 )
 
-if regiao != "Brasil":
-    uf = st.sidebar.selectbox(
-        "UF",
-        {
-            "Norte": ["Todas", "AC", "AP", "AM", "PA", "RO", "RR", "TO"],
-            "Nordeste": ["Todas", "AL", "BA", "CE", "MA", "PB", "PE", "PI", "RN", "SE"],
-            "Sudeste": ["Todas", "ES", "MG", "RJ", "SP"],
-            "Sul": ["Todas", "PR", "RS", "SC"],
-            "Centro-Oeste": ["Todas", "DF", "GO", "MT", "MS"]
-        }[regiao]
-    )
-else:
-    uf = st.sidebar.selectbox(
-        "UF",
-        ["Todas", "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA",
-         "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS",
-         "RO", "RR", "SC", "SP", "SE", "TO"]
-    )
+# Obter lista de UFs baseada na região selecionada
+lista_ufs_disponiveis = obter_lista_ufs(df, regiao if regiao != "Brasil" else None)
+uf = st.sidebar.selectbox(
+    "UF",
+    ["Todas"] + lista_ufs_disponiveis
+)
 
 
 
 # ===============================
-# DADOS MOCK (layout)
+# MODO DE VISUALIZAÇÃO E SELEÇÃO DE MUNICÍPIOS
 # ===============================
-df = pd.DataFrame({
-    "Município": ["Município A", "Município B", "Município C", "Município D"],
-    "UF": ["SP", "RJ", "MG", "BA"]
-})
-
-# Lista de UFs para comparação
-lista_ufs = ["SP", "RJ", "MG", "BA", "RS", "PR", "SC", "PE", "CE"]
-
 
 # Determinar modo de visualização baseado na seleção de UF
 if uf != "Todas" and len(uf) == 2:  # UF específica
@@ -78,7 +73,8 @@ if uf != "Todas" and len(uf) == 2:  # UF específica
         ["Todos os municípios", "Município único", "Comparar municípios"]
     )
     
-    municipios = sorted(df["Município"].unique())
+    # Obter lista de municípios da UF selecionada
+    municipios = obter_lista_municipios(df, uf)
     
     if modo == "Município único":
         municipio_sel = st.sidebar.selectbox("Município", municipios)
@@ -86,10 +82,11 @@ if uf != "Todas" and len(uf) == 2:  # UF específica
         municipios_sel = st.sidebar.multiselect(
             "Municípios para comparação",
             municipios,
-            default=municipios[:2]
+            default=municipios[:min(2, len(municipios))]
         )
 else:  # Todas as UFs ou região
     modo = "Agregado"
+    municipios = []
 
 
 st.sidebar.markdown("---")
@@ -287,19 +284,15 @@ with col5:
         
     else:  # Modo Agregado
         # Comparação entre UFs ou regiões
-        df_line = pd.DataFrame({
-            "Ano": list(range(2010, 2024)) * 5,
-            "UF": [uf_nome for uf_nome in lista_ufs[:5] for _ in range(14)],
-            "PIB (R$ bi)": [i * 15 * (1 + idx * 0.4)
-                    for idx in range(5)
-                    for i in range(14)]
-        })
+        df_line = dados_evolucao_pib(df, uf=uf, ano_ini=2010, ano_fim=2023)
+
+        # st.write(df_line)  # DEBUG
         
         fig_line = px.line(
             df_line,
-            x="Ano",
-            y="PIB (R$ bi)",
-            color="UF",
+            x="ano",
+            y="pib_total",
+            color="sigla_uf",
             markers=True,
             title="Top 5 UFs por PIB"
         )
