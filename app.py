@@ -135,11 +135,14 @@ if modo == "Município único":
         col4.metric(
             "Crescimento acumulado",
             f"{crescimento_periodo:.1f}%" if crescimento_periodo else "N/A",
-            f"{ano_intervalo[0]} → {ano_intervalo[1]}"
+            f"{ano_intervalo[1]} → {ano_intervalo[0]}" if crescimento_periodo and crescimento_periodo < 0 else f"{ano_intervalo[0]} → {ano_intervalo[1]}",
+            delta_color="normal" if crescimento_periodo and crescimento_periodo > 0 else "inverse"
         )
+
+        ano2 = min(ano_ref, 2021)  # Limitar ao máximo de 2021 para evitar dados inexistentes de VAB
         
         col5.metric(
-            "Participação do Setor Público",
+            f"Participação do Setor Público - {ano2}",
             f"{kpis['dependencia_publica']:.1f}%",
             kpis['setor_dominante']
         )
@@ -177,7 +180,8 @@ elif modo == "Todos os municípios":
         col4.metric(
             "Crescimento acumulado",
             f"{crescimento_periodo:.1f}%" if crescimento_periodo else "N/A",
-            f"{ano_intervalo[0]} → {ano_intervalo[1]}"
+            f"{ano_intervalo[1]} → {ano_intervalo[0]}" if crescimento_periodo and crescimento_periodo < 0 else f"{ano_intervalo[0]} → {ano_intervalo[1]}",
+            delta_color="normal" if crescimento_periodo and crescimento_periodo > 0 else "inverse"
         )
         
         col5.metric(
@@ -234,7 +238,8 @@ elif modo == "Agregado":
         col4.metric(
             "Crescimento acumulado",
             f"{crescimento_periodo:.1f}%" if crescimento_periodo else "N/A",
-            f"{ano_intervalo[0]} → {ano_intervalo[1]}"
+            f"{ano_intervalo[1]} → {ano_intervalo[0]}" if crescimento_periodo and crescimento_periodo < 0 else f"{ano_intervalo[0]} → {ano_intervalo[1]}",
+            delta_color="normal" if crescimento_periodo and crescimento_periodo > 0 else "inverse"
         )
         
         col5.metric(
@@ -351,7 +356,7 @@ with col5:
                 y="PIB (R$ bi)",
                 color="sigla_uf",
                 markers=True,
-                title="Top 5 UFs por PIB"
+                title="Top 5 UFs por PIB" if regiao == "Brasil" else f"UFs na região {regiao}"
             )
             fig_line.update_layout(xaxis_title="Ano", yaxis_title="PIB (R$ bi)", legend_title="UF")
         else:
@@ -361,7 +366,12 @@ with col5:
 
 
 with col6:
-    st.markdown("**Estrutura do Valor Adicionado (2010–2023)**")
+
+    # Ajustar ano_fim para limite de dados de VAB (2021)
+    ano_fim_vab = min(ano_intervalo[1], 2021)
+
+
+    st.markdown(f"**Estrutura do Valor Adicionado ({ano_intervalo[0]}–{ano_fim_vab})**")
     
     if modo == "Município único":
         df_area = dados_evolucao_valor_adicionado(
@@ -371,15 +381,14 @@ with col6:
             ano_fim=ano_intervalo[1]
         )
     elif modo == "Comparar municípios" and municipios_sel and len(municipios_sel) > 0:
-        # Agregar todos os municípios selecionados
-        df_area = dados_evolucao_valor_adicionado(
-            df,
-            uf=uf,
-            ano_ini=ano_intervalo[0],
-            ano_fim=ano_intervalo[1]
-        )
-        # Filtrar pelos municípios selecionados
-        df_temp = df[(df["sigla_uf"] == uf) & (df["nome_municipio"].isin(municipios_sel))]
+
+        # Filtrar pelos municípios selecionados E pelo intervalo de anos
+        df_temp = df[
+            (df["sigla_uf"] == uf) & 
+            (df["nome_municipio"].isin(municipios_sel)) &
+            (df["ano"] >= ano_intervalo[0]) &
+            (df["ano"] <= ano_fim_vab)
+        ]
         df_area = df_temp.groupby("ano").agg({
             "vab_agropecuaria": "sum",
             "vab_industria": "sum",
@@ -430,13 +439,22 @@ with col6:
 # COMPOSIÇÃO DO PIB (ANO REF)
 # ===============================
 if modo == "Município único":
+
+    # ano_ref no máximo 2021
+    ano_ref = min(ano_ref, 2021)
+
+
     st.markdown("---")
-    st.subheader(f"🧩 Composição do PIB — {ano_ref}")
-    st.caption("Estrutura setorial e posicionamento relativo do município")
     
-    col7, col8 = st.columns(2)
+    
+    # col7, col8 = st.columns(2)
+    # colunas na proporção 1, 1.5
+    col7, col8 = st.columns([1, 1.5])
     
     with col7:
+        st.subheader(f"🧩 Composição do PIB — {ano_ref}")
+        st.caption("Estrutura setorial e posicionamento relativo do município")
+
         df_donut = composicao_setorial_municipio(df, municipio_sel, ano_ref)
         
         if df_donut is not None and not df_donut.empty:
@@ -453,23 +471,35 @@ if modo == "Município único":
     with col8:
         st.markdown("### 🧠 Escala econômica vs renda")
         st.caption(
-            "Comparação do município selecionado com outros municípios da mesma UF, "
+            "Comparação do município selecionado com outros municípios da mesma UF e com população similar, "
             "avaliando relação entre tamanho da economia, renda média e dependência pública."
         )
         
-        df_scatter = scatter_pib_vs_per_capita(df, uf, ano_ref)
+        df_scatter = scatter_pib_vs_per_capita(df, uf, municipio_sel, ano_ref)
         
         if df_scatter is not None and not df_scatter.empty:
+            # Criar coluna para cor baseada em se é referência
+            df_scatter["Cor"] = df_scatter["É Referência"].map({
+                True: "Município Selecionado",
+                False: "Outros Municípios"
+            })
+            
             fig_scatter = px.scatter(
                 df_scatter,
                 x="PIB Total (R$ mi)",
                 y="PIB per capita (R$)",
                 size="Dependência Pública (%)",
+                color="Cor",
+                color_discrete_map={
+                    "Município Selecionado": "#FF4B4B",  # Vermelho destacado
+                    "Outros Municípios": "#1f77b4"        # Azul padrão
+                },
                 hover_data=["Município"],
                 text="Município",
                 size_max=40
             )
             fig_scatter.update_traces(textposition='top center', textfont_size=8)
+            fig_scatter.update_layout(legend_title="Legenda")
             st.plotly_chart(fig_scatter, use_container_width=True)
         else:
             st.warning("Dados de scatter não disponíveis")
@@ -529,6 +559,7 @@ if modo == "Todos os municípios":
     col_dist1, col_dist2 = st.columns(2)
     
     with col_dist1:
+        ano_ref = min(ano_ref, 2021)
         st.markdown("**Distribuição setorial média**")
         df_setores_uf = composicao_setorial_uf(df, uf, ano_ref)
         
@@ -562,6 +593,7 @@ if modo == "Todos os municípios":
             st.warning("Dados de distribuição não disponíveis")
     
     # Tabela detalhada
+    ano_ref = min(ano_ref, 2021)
     st.markdown("**📋 Tabela Detalhada - Municípios de {} ({} municípios)**".format(uf, len(municipios)))
     df_table_todos = tabela_municipios_completa(df, uf, ano_ref, ano_intervalo[0])
     
@@ -715,6 +747,9 @@ if modo == "Agregado":
     tab1, tab2 = st.tabs(["📋 Tabela Detalhada", "🧩 Composição Setorial"])
     
     with tab1:
+        # ano no máximo 2021
+        ano_ref = min(ano_ref, 2021)
+
         st.markdown("**Dados Consolidados por UF**")
         df_table_ufs = tabela_ufs_completa(df, ano_ref, ano_intervalo[0], regiao if uf == "Todas" else None)
         

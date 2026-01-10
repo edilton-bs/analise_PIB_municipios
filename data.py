@@ -96,13 +96,19 @@ def calcular_kpis_municipio(df, municipio, ano):
     Returns:
         Dict com KPIs: pib_total, populacao, pib_per_capita, crescimento_ano_anterior, dependencia_publica
     """
+
+    ano2 = min(ano, 2021)  # Limitar ao máximo de 2021 para evitar dados inexistentes de VAB
     # Dados do ano atual
     dados_ano = df[(df["nome_municipio"] == municipio) & (df["ano"] == ano)]
+
+    dados_ano2 = df[(df["nome_municipio"] == municipio) & (df["ano"] == ano2)]
     
     if dados_ano.empty:
         return None
     
     dados_ano = dados_ano.iloc[0]
+
+    dados_ano2 = dados_ano2.iloc[0]
     
     # Dados do ano anterior para calcular crescimento
     dados_ano_anterior = df[(df["nome_municipio"] == municipio) & (df["ano"] == ano - 1)]
@@ -116,7 +122,7 @@ def calcular_kpis_municipio(df, municipio, ano):
     populacao = dados_ano["pib_total"] / dados_ano["pib_per_capita"] if dados_ano["pib_per_capita"] > 0 else 0
     
     # Dependência pública (% do VAB de administração pública no VAB total)
-    dependencia_publica = (dados_ano["vab_adm_defesa_educacao_saude"] / dados_ano["vab_total"]) * 100 if dados_ano["vab_total"] > 0 else 0
+    dependencia_publica = (dados_ano2["vab_adm_defesa_educacao_saude"] / dados_ano2["vab_total"]) * 100 if dados_ano2["vab_total"] > 0 else 0
     
     return {
         "pib_total": dados_ano["pib_total"],
@@ -124,7 +130,7 @@ def calcular_kpis_municipio(df, municipio, ano):
         "pib_per_capita": dados_ano["pib_per_capita"],
         "crescimento_ano_anterior": crescimento,
         "dependencia_publica": dependencia_publica,
-        "setor_dominante": dados_ano["atividade_maior_vab"]
+        "setor_dominante": dados_ano2["atividade_maior_vab"]
     }
 
 
@@ -276,12 +282,17 @@ def dados_evolucao_pib(df, regiao=None, uf=None, municipios=None, ano_ini=None, 
             pib_total=("pib_total", "sum")
         ).reset_index()
     else:
-        # Top 5 UFs
-        top_ufs_ano_fim = df_filtrado[df_filtrado["ano"] == ano_fim].groupby("sigla_uf")["pib_total"].sum().nlargest(5).index.tolist()
+        if regiao and regiao == "Brasil":
+            top_ufs_ano_fim = df_filtrado[df_filtrado["ano"] == ano_fim].groupby("sigla_uf")["pib_total"].sum().nlargest(5).index.tolist()
+        else:
+            # se for região específica, pegar todas as UFs da região
+            top_ufs_ano_fim = df_filtrado[df_filtrado["ano"] == ano_fim].groupby("sigla_uf")["pib_total"].sum().index.tolist()
+        
         df_top_ufs = df_filtrado[df_filtrado["sigla_uf"].isin(top_ufs_ano_fim)]
         df_agrupado = df_top_ufs.groupby(["ano", "sigla_uf"]).agg(
             pib_total=("pib_total", "sum")
         ).reset_index()
+
     
     return df_agrupado
 
@@ -301,8 +312,15 @@ def dados_evolucao_valor_adicionado(df, municipio=None, uf=None, regiao=None, an
     Returns:
         DataFrame com evolução por setor
     """
+
+
+    # Garantir que o ano final não ultrapasse 2021 (limite dos dados de VAB)
+    if ano_fim and ano_fim > 2021:
+        ano_fim = 2021
+
     df_filtrado = filtrar_dados(df, regiao=regiao, uf=uf, municipios=[municipio] if municipio else None, 
                                  ano_ini=ano_ini, ano_fim=ano_fim)
+
     
     df_agrupado = df_filtrado.groupby("ano").agg({
         "vab_agropecuaria": "sum",
@@ -546,13 +564,15 @@ def composicao_setorial_agregado(df, regiao, ano):
 # FUNÇÕES PARA SCATTER/ANÁLISES
 # ===============================
 
-def scatter_pib_vs_per_capita(df, uf, ano):
+def scatter_pib_vs_per_capita(df, uf, municipio, ano):
     """
     Retorna dados para scatter PIB total vs PIB per capita.
+    Retorna o município de referência + 10 municípios com população mais próxima.
     
     Args:
         df: DataFrame base
         uf: Sigla da UF
+        municipio: Nome do município
         ano: Ano de referência
     
     Returns:
@@ -560,14 +580,40 @@ def scatter_pib_vs_per_capita(df, uf, ano):
     """
     dados = df[(df["sigla_uf"] == uf) & (df["ano"] == ano)].copy()
     
+    # Calcular população
+    dados["Populacao"] = (dados["pib_total"] / dados["pib_per_capita"]) * 1000
+    
+    # Obter população do município de referência
+    municipio_ref = dados[dados["nome_municipio"] == municipio]
+    
+    if municipio_ref.empty:
+        return pd.DataFrame()
+    
+    pop_referencia = municipio_ref.iloc[0]["Populacao"]
+    
+    # Calcular diferença absoluta de população
+    dados["Diferenca_Pop"] = (dados["Populacao"] - pop_referencia).abs()
+    
+    # Pegar município de referência + 10 mais próximos
+    municipios_proximos = dados.nsmallest(11, "Diferenca_Pop")
+    
     # Calcular dependência pública
-    dados["Dependência Pública (%)"] = (dados["vab_adm_defesa_educacao_saude"] / dados["vab_total"]) * 100
+    municipios_proximos["Dependência Pública (%)"] = (
+        municipios_proximos["vab_adm_defesa_educacao_saude"] / municipios_proximos["vab_total"]
+    ) * 100
     
-    dados["PIB Total (R$ mi)"] = dados["pib_total"] / 1000
+    municipios_proximos["PIB Total (R$ mi)"] = municipios_proximos["pib_total"] / 1000
     
-    return dados[["nome_municipio", "PIB Total (R$ mi)", "pib_per_capita", "Dependência Pública (%)"]].rename(columns={
+    # Adicionar coluna para destacar o município de referência
+    municipios_proximos["É Referência"] = municipios_proximos["nome_municipio"] == municipio
+    
+    return municipios_proximos[[
+        "nome_municipio", "PIB Total (R$ mi)", "pib_per_capita", 
+        "Dependência Pública (%)", "Populacao", "É Referência"
+    ]].rename(columns={
         "nome_municipio": "Município",
-        "pib_per_capita": "PIB per capita (R$)"
+        "pib_per_capita": "PIB per capita (R$)",
+        "Populacao": "População"
     })
 
 
