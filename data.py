@@ -94,7 +94,7 @@ def calcular_kpis_municipio(df, municipio, ano):
         ano: Ano de referência
     
     Returns:
-        Dict com KPIs: pib_total, populacao, pib_per_capita, crescimento_ano_anterior, dependencia_publica
+        Dict com KPIs: pib_total, populacao, pib_per_capita, crescimento_ano_anterior, cresc_ppc_ano_anterior, dependencia_publica
     """
 
     ano2 = min(ano, 2021)  # Limitar ao máximo de 2021 para evitar dados inexistentes de VAB
@@ -117,7 +117,14 @@ def calcular_kpis_municipio(df, municipio, ano):
     if not dados_ano_anterior.empty:
         pib_anterior = dados_ano_anterior.iloc[0]["pib_total"]
         crescimento = ((dados_ano["pib_total"] - pib_anterior) / pib_anterior) * 100
-    
+
+    # Calcular crescimento pib per capita ano anterior
+    cresc_ppc = None
+    if not dados_ano_anterior.empty:
+        ppc_anterior = dados_ano_anterior.iloc[0]["pib_per_capita"]
+        cresc_ppc = ((dados_ano["pib_per_capita"] - ppc_anterior) / ppc_anterior) * 100
+
+
     # Calcular população (PIB total / PIB per capita)
     populacao = dados_ano["pib_total"] / dados_ano["pib_per_capita"] if dados_ano["pib_per_capita"] > 0 else 0
     
@@ -129,6 +136,7 @@ def calcular_kpis_municipio(df, municipio, ano):
         "populacao": int(populacao * 1000),  # Converter de milhares para unidades
         "pib_per_capita": dados_ano["pib_per_capita"],
         "crescimento_ano_anterior": crescimento,
+        "cresc_ppc_ano_anterior": cresc_ppc,
         "dependencia_publica": dependencia_publica,
         "setor_dominante": dados_ano2["atividade_maior_vab"]
     }
@@ -137,14 +145,6 @@ def calcular_kpis_municipio(df, municipio, ano):
 def calcular_kpis_uf(df, uf, ano):
     """
     Calcula KPIs agregados para uma UF em um ano.
-    
-    Args:
-        df: DataFrame base
-        uf: Sigla da UF
-        ano: Ano de referência
-    
-    Returns:
-        Dict com KPIs agregados
     """
     dados_ano = df[(df["sigla_uf"] == uf) & (df["ano"] == ano)]
     dados_ano_anterior = df[(df["sigla_uf"] == uf) & (df["ano"] == ano - 1)]
@@ -157,12 +157,17 @@ def calcular_kpis_uf(df, uf, ano):
     
     # Calcular população total
     populacao_total = (dados_ano["pib_total"] / dados_ano["pib_per_capita"]).sum() * 1000
+    populacao_total_anterior = (dados_ano_anterior["pib_total"] / dados_ano_anterior["pib_per_capita"]).sum() * 1000 if not dados_ano_anterior.empty else None
     
     # PIB per capita médio ponderado
     pib_per_capita_medio = pib_total / (populacao_total / 1000) if populacao_total > 0 else 0
+    pib_per_capita_medio_anterior = pib_total_anterior / (populacao_total_anterior / 1000) if pib_total_anterior and populacao_total_anterior > 0 else None
     
-    # Crescimento
+    # Crescimento PIB total
     crescimento = ((pib_total - pib_total_anterior) / pib_total_anterior) * 100 if pib_total_anterior else None
+    
+    # Crescimento PIB per capita
+    cresc_ppc = ((pib_per_capita_medio - pib_per_capita_medio_anterior) / pib_per_capita_medio_anterior) * 100 if pib_per_capita_medio_anterior else None
     
     # Número de municípios
     num_municipios = dados_ano["nome_municipio"].nunique()
@@ -172,6 +177,7 @@ def calcular_kpis_uf(df, uf, ano):
         "populacao_total": int(populacao_total),
         "pib_per_capita_medio": pib_per_capita_medio,
         "crescimento_ano_anterior": crescimento,
+        "cresc_ppc_ano_anterior": cresc_ppc,  # ADICIONAR
         "num_municipios": num_municipios
     }
 
@@ -179,14 +185,6 @@ def calcular_kpis_uf(df, uf, ano):
 def calcular_kpis_agregado(df, regiao, ano):
     """
     Calcula KPIs agregados para região ou Brasil.
-    
-    Args:
-        df: DataFrame base
-        regiao: Nome da região ou "Brasil"
-        ano: Ano de referência
-    
-    Returns:
-        Dict com KPIs agregados
     """
     if regiao == "Brasil":
         dados_ano = df[df["ano"] == ano]
@@ -203,12 +201,17 @@ def calcular_kpis_agregado(df, regiao, ano):
     
     # Calcular população total
     populacao_total = (dados_ano["pib_total"] / dados_ano["pib_per_capita"]).sum() * 1000
+    populacao_total_anterior = (dados_ano_anterior["pib_total"] / dados_ano_anterior["pib_per_capita"]).sum() * 1000 if not dados_ano_anterior.empty else None
     
     # PIB per capita médio
     pib_per_capita_medio = pib_total / (populacao_total / 1000) if populacao_total > 0 else 0
+    pib_per_capita_medio_anterior = pib_total_anterior / (populacao_total_anterior / 1000) if pib_total_anterior and populacao_total_anterior > 0 else None
     
-    # Crescimento
+    # Crescimento PIB total
     crescimento = ((pib_total - pib_total_anterior) / pib_total_anterior) * 100 if pib_total_anterior else None
+    
+    # Crescimento PIB per capita
+    cresc_ppc = ((pib_per_capita_medio - pib_per_capita_medio_anterior) / pib_per_capita_medio_anterior) * 100 if pib_per_capita_medio_anterior else None
     
     # Número de municípios
     num_municipios = dados_ano["nome_municipio"].nunique()
@@ -218,6 +221,7 @@ def calcular_kpis_agregado(df, regiao, ano):
         "populacao_total": int(populacao_total),
         "pib_per_capita_medio": pib_per_capita_medio,
         "crescimento_ano_anterior": crescimento,
+        "cresc_ppc_ano_anterior": cresc_ppc,  # ADICIONAR
         "num_municipios": num_municipios
     }
 

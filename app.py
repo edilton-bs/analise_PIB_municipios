@@ -154,14 +154,14 @@ if modo == "Município único":
         col3.metric(
             f"PIB per capita ({ano_ref})",
             f"R$ {kpis['pib_per_capita']:,.0f}".replace(",", "."),
-            None
+            f"{kpis['cresc_ppc_ano_anterior']:.1f}% vs ano anterior" if kpis['cresc_ppc_ano_anterior'] else "N/A"
         )
         
         col4.metric(
-            "Crescimento acumulado",
-            f"{crescimento_periodo:.1f}%" if crescimento_periodo else "N/A",
-            f"{ano_intervalo[1]} → {ano_intervalo[0]}" if crescimento_periodo and crescimento_periodo < 0 else f"{ano_intervalo[0]} → {ano_intervalo[1]}",
-            delta_color="normal" if crescimento_periodo and crescimento_periodo > 0 else "inverse"
+            f"Crescimento acumulado ({ano_intervalo[0]}–{ano_intervalo[1]})",
+            f"{crescimento_periodo:.1f}%" if crescimento_periodo else "N/A"
+            # f"{ano_intervalo[1]} → {ano_intervalo[0]}" if crescimento_periodo and crescimento_periodo < 0 else f"{ano_intervalo[0]} → {ano_intervalo[1]}",
+            # delta_color="normal" if crescimento_periodo and crescimento_periodo > 0 else "inverse"
         )
 
         ano2 = min(ano_ref, 2021)  # Limitar ao máximo de 2021 para evitar dados inexistentes de VAB
@@ -199,14 +199,14 @@ elif modo == "Todos os municípios":
         col3.metric(
             f"PIB per capita médio ({ano_ref})",
             f"R$ {kpis['pib_per_capita_medio']:,.0f}".replace(",", "."),
-            None
+            f"{kpis['cresc_ppc_ano_anterior']:.1f}% vs ano anterior" if kpis['cresc_ppc_ano_anterior'] else "N/A"
         )
         
         col4.metric(
-            "Crescimento acumulado",
-            f"{crescimento_periodo:.1f}%" if crescimento_periodo else "N/A",
-            f"{ano_intervalo[1]} → {ano_intervalo[0]}" if crescimento_periodo and crescimento_periodo < 0 else f"{ano_intervalo[0]} → {ano_intervalo[1]}",
-            delta_color="normal" if crescimento_periodo and crescimento_periodo > 0 else "inverse"
+            f"Crescimento acumulado ({ano_intervalo[0]}–{ano_intervalo[1]})",
+            f"{crescimento_periodo:.1f}%" if crescimento_periodo else "N/A"
+          #  f"{ano_intervalo[1]} → {ano_intervalo[0]}" if crescimento_periodo and crescimento_periodo < 0 else f"{ano_intervalo[0]} → {ano_intervalo[1]}",
+          #  delta_color="normal" if crescimento_periodo and crescimento_periodo > 0 else "inverse"
         )
         
         col5.metric(
@@ -257,20 +257,20 @@ elif modo == "Agregado":
         col3.metric(
             f"PIB per capita médio ({ano_ref})",
             f"R$ {kpis['pib_per_capita_medio']:,.0f}".replace(",", "."),
-            None
+            f"{kpis['cresc_ppc_ano_anterior']:.1f}% vs ano anterior" if kpis['cresc_ppc_ano_anterior'] else "N/A"
         )
         
         col4.metric(
-            "Crescimento acumulado",
-            f"{crescimento_periodo:.1f}%" if crescimento_periodo else "N/A",
-            f"{ano_intervalo[1]} → {ano_intervalo[0]}" if crescimento_periodo and crescimento_periodo < 0 else f"{ano_intervalo[0]} → {ano_intervalo[1]}",
-            delta_color="normal" if crescimento_periodo and crescimento_periodo > 0 else "inverse"
+            f"Crescimento acumulado ({ano_intervalo[0]}–{ano_intervalo[1]})",
+            f"{crescimento_periodo:.1f}%" if crescimento_periodo else "N/A"
+          #  f"{ano_intervalo[1]} → {ano_intervalo[0]}" if crescimento_periodo and crescimento_periodo < 0 else f"{ano_intervalo[0]} → {ano_intervalo[1]}",
+          #  delta_color="normal" if crescimento_periodo and crescimento_periodo > 0 else "inverse"
         )
         
         col5.metric(
             "Número de municípios",
-            f"{kpis['num_municipios']}",
-            titulo_contexto
+            f"{kpis['num_municipios']}"
+            # titulo_contexto
         )
     else:
         st.warning("Dados não disponíveis para a seleção.")
@@ -492,6 +492,7 @@ if modo == "Município único":
                 names="Setor",
                 values="Participação (%)",
                 hole=0.5,
+                color="Setor",
                 color_discrete_map=CORES_SETORES
             )
             st.plotly_chart(fig_donut, use_container_width=True)
@@ -642,6 +643,8 @@ if modo == "Comparar municípios" and municipios_sel and len(municipios_sel) > 1
     st.markdown("---")
     st.subheader("🔍 Comparação Direta entre Municípios")
     st.caption("Análise lado a lado dos municípios selecionados para identificar diferenças e padrões")
+
+    ano_ref = min(ano_ref, 2021)
     
     col9, col10 = st.columns(2)
     
@@ -649,7 +652,7 @@ if modo == "Comparar municípios" and municipios_sel and len(municipios_sel) > 1
     dados_comparacao = df[(df["sigla_uf"] == uf) & (df["nome_municipio"].isin(municipios_sel)) & (df["ano"] == ano_ref)]
     
     with col9:
-        st.markdown("**PIB Total**")
+        st.markdown(f"**PIB Total - {ano_ref}**")
         if not dados_comparacao.empty:
             df_bar_pib = dados_comparacao[["nome_municipio", "pib_total"]].copy()
             df_bar_pib["PIB Total (R$ mi)"] = df_bar_pib["pib_total"] / 1000
@@ -666,7 +669,7 @@ if modo == "Comparar municípios" and municipios_sel and len(municipios_sel) > 1
             st.warning("Dados não disponíveis")
     
     with col10:
-        st.markdown("**PIB per capita**")
+        st.markdown(f"**PIB per capita - {ano_ref}**")
         if not dados_comparacao.empty:
             fig_bar_pc = px.bar(
                 dados_comparacao,
@@ -679,13 +682,14 @@ if modo == "Comparar municípios" and municipios_sel and len(municipios_sel) > 1
         else:
             st.warning("Dados não disponíveis")
     
-    st.markdown("**Tabela Comparativa Consolidada**")
+    st.markdown(f"**Tabela Comparativa Consolidada - {ano_ref}**")
     if not dados_comparacao.empty:
         # Calcular métricas para tabela
+        ano_fim = min(ano_intervalo[1], 2021)
         tabela_comp = []
         for _, row in dados_comparacao.iterrows():
             municipio = row["nome_municipio"]
-            crescimento = calcular_crescimento_periodo(df, municipio, "nome_municipio", ano_intervalo[0], ano_intervalo[1])
+            crescimento = calcular_crescimento_periodo(df, municipio, "nome_municipio", ano_intervalo[0], ano_fim)
             dependencia = (row["vab_adm_defesa_educacao_saude"] / row["vab_total"]) * 100 if row["vab_total"] > 0 else 0
             
             tabela_comp.append({
@@ -693,7 +697,7 @@ if modo == "Comparar municípios" and municipios_sel and len(municipios_sel) > 1
                 "PIB Total (R$ mi)": row["pib_total"] / 1000,
                 "PIB per capita (R$)": row["pib_per_capita"],
                 "Dependência Pública (%)": dependencia,
-                f"Crescimento {ano_intervalo[0]}–{ano_intervalo[1]}": f"{crescimento:.1f}%" if crescimento else "N/A",
+                f"Crescimento {ano_intervalo[0]}–{ano_fim}": f"{crescimento:.1f}%" if crescimento else "N/A",
                 "Setor Dominante": row["atividade_maior_vab"]
             })
         
@@ -818,7 +822,9 @@ if modo == "Agregado":
             st.markdown("**Participação setorial por UF**")
             # Obter composição setorial de cada UF
             if regiao == "Brasil":
-                ufs_para_mostrar = df[df["ano"] == ano_ref]["sigla_uf"].unique()[:10]  # Top 10
+                st.caption("Comparação entre as 10 UFs com maior PIB")
+                pib_por_uf = df[df["ano"] == ano_ref].groupby("sigla_uf")["pib_total"].sum().sort_values(ascending=False)
+                ufs_para_mostrar = pib_por_uf.head(10).index.tolist()
             else:
                 ufs_para_mostrar = df[(df["nome_grande_regiao"] == regiao) & (df["ano"] == ano_ref)]["sigla_uf"].unique()
             

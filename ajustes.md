@@ -1,14 +1,15 @@
 # Ajustes
 
 # Geral
-- Padronizar cores dos setores entre todos os gráficos [*]
-- Corrigir direção da seta vertical em crescimento acumulado (deve apontar para cima se positivo e para baixo se negativo)
-- Remover nome do estado/região abaixo do número de municípios
+- Padronizar cores dos setores entre todos os gráficos [ok]
+- Corrigir direção da seta vertical em crescimento acumulado (deve apontar para cima se positivo e para baixo se negativo) [ok]
+- Remover nome do estado/região abaixo do número de municípios [ok]
 - Dizer o ano para todas as métricas e gráficos (ex: PIB 2021, PIB per capita 2021, etc)
 
 
 
 # Análise BRASIL/Região todas as UFs:
+- Participação setorial por UF - incluir todos os estados
 
 
 
