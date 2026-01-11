@@ -11,6 +11,31 @@ from data import (
     tabela_municipios_completa, tabela_ufs_completa
 )
 
+# Cores padronizadas para os setores econômicos (mais vibrantes para funcionar em ambos os temas)
+CORES_SETORES = {
+    "Agropecuária": "#4CAF50",        # Verde vibrante
+    "Indústria": "#2196F3",           # Azul vibrante
+    "Serviços": "#FF9800",            # Laranja vibrante
+    "Administração Pública": "#F44336"  # Vermelho vibrante
+}
+
+# Paleta para gráficos de linha/comparação (cores saturadas)
+PALETA_COMPARACAO = [
+    "#2196F3",  # Azul vibrante
+    "#FF9800",  # Laranja vibrante
+    "#4CAF50",  # Verde vibrante
+    "#F44336",  # Vermelho vibrante
+    "#9C27B0",  # Roxo vibrante
+    "#795548",  # Marrom vibrante
+    "#E91E63",  # Rosa vibrante
+    "#607D8B",  # Cinza-azulado
+    "#CDDC39",  # Lima
+    "#00BCD4"   # Ciano vibrante
+]
+
+# Cores para destaque (alto contraste)
+COR_REFERENCIA = "#FF5252"    # Vermelho vibrante (destaque)
+COR_SECUNDARIA = "#64B5F6"    # Azul claro (neutro)
 
 # ===============================
 # CONFIGURAÇÃO DA PÁGINA
@@ -306,7 +331,8 @@ with col5:
                     x="ano",
                     y="PIB (R$ mi)",
                     color="nome_municipio",
-                    markers=True
+                    markers=True,
+                    color_discrete_sequence=PALETA_COMPARACAO
                 )
                 fig_line.update_layout(xaxis_title="Ano", yaxis_title="PIB (R$ mi)", legend_title="Município")
             else:
@@ -332,7 +358,8 @@ with col5:
                 y="PIB (R$ mi)",
                 color="nome_municipio",
                 markers=True,
-                title=f"Top 5 municípios por PIB"
+                title=f"Top 5 municípios por PIB",
+                color_discrete_sequence=PALETA_COMPARACAO
             )
             fig_line.update_layout(xaxis_title="Ano", yaxis_title="PIB (R$ mi)", legend_title="Município")
         else:
@@ -356,7 +383,8 @@ with col5:
                 y="PIB (R$ bi)",
                 color="sigla_uf",
                 markers=True,
-                title="Top 5 UFs por PIB" if regiao == "Brasil" else f"UFs na região {regiao}"
+                title="Top 5 UFs por PIB" if regiao == "Brasil" else f"UFs na região {regiao}",
+                color_discrete_sequence=PALETA_COMPARACAO
             )
             fig_line.update_layout(xaxis_title="Ano", yaxis_title="PIB (R$ bi)", legend_title="UF")
         else:
@@ -426,7 +454,8 @@ with col6:
         fig_area = px.area(
             df_area,
             x="ano",
-            y=["Agropecuária", "Indústria", "Serviços", "Administração Pública"]
+            y=["Agropecuária", "Indústria", "Serviços", "Administração Pública"],
+            color_discrete_map=CORES_SETORES
         )
         fig_area.update_layout(xaxis_title="Ano", yaxis_title="Valor Adicionado (R$ mi)", legend_title="Setor")
     else:
@@ -462,7 +491,8 @@ if modo == "Município único":
                 df_donut,
                 names="Setor",
                 values="Participação (%)",
-                hole=0.5
+                hole=0.5,
+                color_discrete_map=CORES_SETORES
             )
             st.plotly_chart(fig_donut, use_container_width=True)
         else:
@@ -491,8 +521,8 @@ if modo == "Município único":
                 size="Dependência Pública (%)",
                 color="Cor",
                 color_discrete_map={
-                    "Município Selecionado": "#FF4B4B",  # Vermelho destacado
-                    "Outros Municípios": "#1f77b4"        # Azul padrão
+                    "Município Selecionado": COR_REFERENCIA,  # Vermelho forte
+                    "Outros Municípios": COR_SECUNDARIA       # Azul escuro
                 },
                 hover_data=["Município"],
                 text="Município",
@@ -548,7 +578,7 @@ if modo == "Todos os municípios":
                 orientation='h',
                 text_auto='.0f',
                 color="PIB per capita (R$)",
-                color_continuous_scale="Viridis"
+                color_continuous_scale="RdYlGn"  # Vermelho-Amarelo-Verde
             )
             st.plotly_chart(fig_ranking_pc, use_container_width=True)
         else:
@@ -568,7 +598,9 @@ if modo == "Todos os municípios":
                 df_setores_uf,
                 names="Setor",
                 values="Participação (%)",
-                hole=0.5
+                hole=0.5,
+                color="Setor",
+                color_discrete_map=CORES_SETORES
             )
             st.plotly_chart(fig_setores_uf, use_container_width=True)
         else:
@@ -694,7 +726,9 @@ if modo == "Agregado":
                 y="UF",
                 x="PIB Total (R$ bi)",
                 orientation='h',
-                text_auto='.1f'
+                text_auto='.1f',
+                color="PIB Total (R$ bi)",
+                color_continuous_scale="Blues"
             )
             st.plotly_chart(fig_ranking, use_container_width=True)
         else:
@@ -735,7 +769,9 @@ if modo == "Agregado":
             size="Nº Municípios",
             hover_data=["UF"],
             text="UF",
-            size_max=50
+            size_max=50,
+            color="PIB per capita (R$)",
+            color_continuous_scale="Viridis"
         )
         fig_scatter_ufs.update_traces(textposition='top center')
         st.plotly_chart(fig_scatter_ufs, use_container_width=True)
@@ -770,7 +806,9 @@ if modo == "Agregado":
                     df_setores_agg,
                     names="Setor",
                     values="Participação (%)",
-                    hole=0.5
+                    hole=0.5,
+                    color="Setor",
+                    color_discrete_map=CORES_SETORES
                 )
                 st.plotly_chart(fig_setores, use_container_width=True)
             else:
@@ -799,7 +837,8 @@ if modo == "Agregado":
                     x="UF",
                     y="Participação (%)",
                     color="Setor",
-                    text_auto='.1f'
+                    text_auto='.1f',
+                    color_discrete_map=CORES_SETORES
                 )
                 st.plotly_chart(fig_stacked, use_container_width=True)
             else:
