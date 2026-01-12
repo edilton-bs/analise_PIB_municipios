@@ -30,3 +30,7 @@
     - Se Região for Brasil, a comparação pode ser entre quaisquer municípios do Brasil
     - Se Região for uma região específica (ex: Sudeste), a comparação pode ser apenas entre municípios daquela região
     - Na verdade permitir o modo de visualização mesmo que UF não seja selecionada
+
+- Rever comparação entre municípios:
+    - Faz sentido colocar o gráfico de valor adcionado dos municípios envolvidos na comparação?
+    - Colocar comparação de participação setorial entre os municípios envolvidos na comparação.

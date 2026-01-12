@@ -46,6 +46,17 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+def formatar_valor(valor): 
+    if valor < 1_000_000: 
+        # até milhões 
+        return f"R$ {valor/1000:.1f} mi" 
+    elif valor < 1_000_000_000: 
+        # até bilhões 
+        return f"R$ {valor/1_000_000:.1f} bi" 
+    else: 
+        # trilhões 
+        return f"R$ {valor/1_000_000_000:.1f} tri"
+
 
 # ===============================
 # CARREGAR DADOS
@@ -141,7 +152,7 @@ if modo == "Município específico":
         
         col1.metric(
             f"PIB Total ({ano_ref})",
-            f"R$ {kpis['pib_total']/1000:.1f} mi" if kpis['pib_total'] < 1_000_000 else f"R$ {kpis['pib_total']/1_000_000:.1f} bi",
+            formatar_valor(kpis['pib_total']),
             f"{kpis['crescimento_ano_anterior']:.1f}% vs ano anterior" if kpis['crescimento_ano_anterior'] else "N/A"
         )
 
@@ -186,7 +197,7 @@ elif modo == "Todos os municípios":
         
         col1.metric(
             f"PIB Total ({ano_ref})",
-            f"R$ {kpis['pib_total']/1000:.1f} mi" if kpis['pib_total'] < 1_000_000 else f"R$ {kpis['pib_total']/1_000_000:.1f} bi",
+            formatar_valor(kpis['pib_total']),
             f"{kpis['crescimento_ano_anterior']:.1f}% vs ano anterior" if kpis['crescimento_ano_anterior'] else "N/A"
         )
 
@@ -211,8 +222,8 @@ elif modo == "Todos os municípios":
         
         col5.metric(
             "Número de municípios",
-            f"{kpis['num_municipios']}",
-            f"{uf}"
+            f"{kpis['num_municipios']}"
+            # f"{uf}"
         )
     else:
         st.warning("Dados não disponíveis para a UF selecionada.")
@@ -244,7 +255,7 @@ elif modo == "Agregado":
         
         col1.metric(
             f"PIB Total ({ano_ref})",
-            f"R$ {kpis['pib_total']/1_000_000:.1f} bi",
+            formatar_valor(kpis['pib_total']),
             f"{kpis['crescimento_ano_anterior']:.1f}% vs ano anterior" if kpis['crescimento_ano_anterior'] else "N/A"
         )
 
