@@ -75,7 +75,7 @@ ano_ref = st.sidebar.selectbox(
 
 regiao = st.sidebar.selectbox(
     "Região",
-    ["Brasil", "Norte", "Nordeste", "Sudeste", "Sul", "Centro-Oeste"]
+    ["Brasil", "Norte", "Nordeste", "Sudeste", "Sul", "Centro-oeste"]
 )
 
 # Obter lista de UFs baseada na região selecionada
@@ -95,13 +95,13 @@ uf = st.sidebar.selectbox(
 if uf != "Todas" and len(uf) == 2:  # UF específica
     modo = st.sidebar.radio(
         "Modo de visualização",
-        ["Todos os municípios", "Município único", "Comparar municípios"]
+        ["Todos os municípios", "Município específico", "Comparar municípios"]
     )
     
     # Obter lista de municípios da UF selecionada
     municipios = obter_lista_municipios(df, uf)
     
-    if modo == "Município único":
+    if modo == "Município específico":
         municipio_sel = st.sidebar.selectbox("Município", municipios)
     elif modo == "Comparar municípios":
         municipios_sel = st.sidebar.multiselect(
@@ -129,7 +129,7 @@ st.caption("Análise econômica municipal • 2010–2023")
 # KPIs — VISÃO EXECUTIVA
 # ===============================
 
-if modo == "Município único":
+if modo == "Município específico":
     st.subheader(f"📌 Indicadores-chave - {municipio_sel}")
     
     # Calcular KPIs usando data.py
@@ -288,9 +288,9 @@ col5, col6 = st.columns(2)
 
 
 with col5:
-    st.markdown("**Evolução do PIB ao longo do tempo**")
+    st.markdown(f"**Evolução do PIB ao longo do tempo ({ano_intervalo[0]}–{ano_intervalo[1]})**")
     
-    if modo == "Município único":
+    if modo == "Município específico":
         df_line = dados_evolucao_pib(
             df, 
             uf=uf,
@@ -401,7 +401,7 @@ with col6:
 
     st.markdown(f"**Estrutura do Valor Adicionado ({ano_intervalo[0]}–{ano_fim_vab})**")
     
-    if modo == "Município único":
+    if modo == "Município específico":
         df_area = dados_evolucao_valor_adicionado(
             df,
             municipio=municipio_sel,
@@ -467,7 +467,7 @@ with col6:
 # ===============================
 # COMPOSIÇÃO DO PIB (ANO REF)
 # ===============================
-if modo == "Município único":
+if modo == "Município específico":
 
     # ano_ref no máximo 2021
     ano_ref = min(ano_ref, 2021)
@@ -503,7 +503,7 @@ if modo == "Município único":
         st.markdown("### 🧠 Escala econômica vs renda")
         st.caption(
             "Comparação do município selecionado com outros municípios da mesma UF e com população similar, "
-            "avaliando relação entre tamanho da economia, renda média e dependência pública."
+            "avaliando relação entre tamanho da economia, renda média e dependência pública. Dados de PIB e PIB per capita referentes ao ano de {}.".format(ano_ref)
         )
         
         df_scatter = scatter_pib_vs_per_capita(df, uf, municipio_sel, ano_ref)
@@ -547,7 +547,7 @@ if modo == "Todos os municípios":
     col_todos1, col_todos2 = st.columns(2)
     
     with col_todos1:
-        st.markdown("**Ranking: PIB Total**")
+        st.markdown("**Ranking: PIB Total - {}**".format(ano_ref))
         df_ranking_mun = ranking_municipios_pib(df, uf, ano_ref, top_n=10)
         
         if df_ranking_mun is not None and not df_ranking_mun.empty:
@@ -566,7 +566,7 @@ if modo == "Todos os municípios":
             st.warning("Dados de ranking não disponíveis")
     
     with col_todos2:
-        st.markdown("**Ranking: PIB per capita**")
+        st.markdown("**Ranking: PIB per capita - {}**".format(ano_ref))
         df_ranking_pc = ranking_municipios_per_capita(df, uf, ano_ref, top_n=10)
         
         if df_ranking_pc is not None and not df_ranking_pc.empty:
@@ -591,7 +591,7 @@ if modo == "Todos os municípios":
     
     with col_dist1:
         ano_ref = min(ano_ref, 2021)
-        st.markdown("**Distribuição setorial média**")
+        st.markdown("**Distribuição setorial média - {}**".format(ano_ref))
         df_setores_uf = composicao_setorial_uf(df, uf, ano_ref)
         
         if df_setores_uf is not None and not df_setores_uf.empty:
@@ -608,7 +608,7 @@ if modo == "Todos os municípios":
             st.warning("Dados setoriais não disponíveis")
     
     with col_dist2:
-        st.markdown("**Distribuição do PIB per capita**")
+        st.markdown("**Distribuição do PIB per capita - {}**".format(ano_ref))
         # Obter dados de PIB per capita de todos os municípios da UF
         dados_uf = df[(df["sigla_uf"] == uf) & (df["ano"] == ano_ref)]
         
@@ -628,6 +628,7 @@ if modo == "Todos os municípios":
     # Tabela detalhada
     ano_ref = min(ano_ref, 2021)
     st.markdown("**📋 Tabela Detalhada - Municípios de {} ({} municípios)**".format(uf, len(municipios)))
+    st.caption("Dados referentes ao ano de {}".format(ano_ref))
     df_table_todos = tabela_municipios_completa(df, uf, ano_ref, ano_intervalo[0])
     
     if df_table_todos is not None and not df_table_todos.empty:
@@ -791,6 +792,7 @@ if modo == "Agregado":
         ano_ref = min(ano_ref, 2021)
 
         st.markdown("**Dados Consolidados por UF**")
+        st.caption("Tabela detalhada com principais indicadores econômicos das UFs para o ano de {}".format(ano_ref))
         df_table_ufs = tabela_ufs_completa(df, ano_ref, ano_intervalo[0], regiao if uf == "Todas" else None)
         
         if df_table_ufs is not None and not df_table_ufs.empty:
@@ -802,7 +804,7 @@ if modo == "Agregado":
         col_tab1, col_tab2 = st.columns(2)
         
         with col_tab1:
-            st.markdown("**Distribuição setorial média**")
+            st.markdown("**Distribuição setorial média - {}**".format(ano_ref))
             df_setores_agg = composicao_setorial_agregado(df, regiao, ano_ref)
             
             if df_setores_agg is not None and not df_setores_agg.empty:
@@ -819,7 +821,7 @@ if modo == "Agregado":
                 st.warning("Dados setoriais não disponíveis")
         
         with col_tab2:
-            st.markdown("**Participação setorial por UF**")
+            st.markdown("**Participação setorial por UF - {}**".format(ano_ref))
             # Obter composição setorial de cada UF
             if regiao == "Brasil":
                 st.caption("Comparação entre as 10 UFs com maior PIB")
