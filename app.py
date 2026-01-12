@@ -694,30 +694,137 @@ if modo == "Comparar municípios" and municipios_sel and len(municipios_sel) > 1
         else:
             st.warning("Dados não disponíveis")
     
-    st.markdown(f"**Tabela Comparativa Consolidada - {ano_ref}**")
-    if not dados_comparacao.empty:
-        # Calcular métricas para tabela
-        ano_fim = min(ano_intervalo[1], 2021)
-        tabela_comp = []
-        for _, row in dados_comparacao.iterrows():
-            municipio = row["nome_municipio"]
-            crescimento = calcular_crescimento_periodo(df, municipio, "nome_municipio", ano_intervalo[0], ano_fim)
-            dependencia = (row["vab_adm_defesa_educacao_saude"] / row["vab_total"]) * 100 if row["vab_total"] > 0 else 0
-            
-            tabela_comp.append({
-                "Município": municipio,
-                "PIB Total (R$ mi)": row["pib_total"] / 1000,
-                "PIB per capita (R$)": row["pib_per_capita"],
-                "Dependência Pública (%)": dependencia,
-                f"Crescimento {ano_intervalo[0]}–{ano_fim}": f"{crescimento:.1f}%" if crescimento else "N/A",
-                "Setor Dominante": row["atividade_maior_vab"]
-            })
-        
-        df_table = pd.DataFrame(tabela_comp)
-        st.dataframe(df_table, use_container_width=True)
-    else:
-        st.warning("Tabela não disponível")
+    # st.markdown(f"**Tabela Comparativa Consolidada - {ano_ref}**")
 
+
+    # Análises Avançadas (em Tabs)
+    st.markdown("---")
+    tab1, tab2 = st.tabs(["📋 Tabela Detalhada", "🧩 Composição Setorial"])
+    
+    with tab1:
+        st.markdown("**Dados Consolidados - Comparação Completa**")
+        st.caption(f"Indicadores detalhados dos {len(municipios_sel)} municípios selecionados para o ano {ano_ref}")
+        
+        if not dados_comparacao.empty:
+            # Criar tabela expandida com mais indicadores
+            ano_fim = min(ano_intervalo[1], 2021)
+            tabela_detalhada = []
+            
+            for _, row in dados_comparacao.iterrows():
+                municipio = row["nome_municipio"]
+                crescimento = calcular_crescimento_periodo(df, municipio, "nome_municipio", ano_intervalo[0], ano_fim)
+                
+                # Calcular população
+                populacao = (row["pib_total"] / row["pib_per_capita"]) * 1000 if row["pib_per_capita"] > 0 else 0
+                
+                # Dependência pública
+                dependencia = (row["vab_adm_defesa_educacao_saude"] / row["vab_total"]) * 100 if row["vab_total"] > 0 else 0
+                
+                tabela_detalhada.append({
+                    "Município": municipio,
+                    "População": f"{int(populacao):,}".replace(",", "."),
+                    "PIB Total (R$ mi)": f"{row['pib_total'] / 1000:.1f}",
+                    "PIB per capita (R$)": f"{row['pib_per_capita']:,.0f}".replace(",", "."),
+                    "Agropecuária (%)": f"{(row['vab_agropecuaria'] / row['vab_total'] * 100):.1f}" if row['vab_total'] > 0 else "0.0",
+                    "Indústria (%)": f"{(row['vab_industria'] / row['vab_total'] * 100):.1f}" if row['vab_total'] > 0 else "0.0",
+                    "Serviços (%)": f"{(row['vab_servicos'] / row['vab_total'] * 100):.1f}" if row['vab_total'] > 0 else "0.0",
+                    "Adm. Pública (%)": f"{dependencia:.1f}",
+                    f"Crescimento {ano_intervalo[0]}–{ano_fim}": f"{crescimento:.1f}%" if crescimento else "N/A",
+                    "Setor Dominante": row["atividade_maior_vab"]
+                })
+            
+            df_table_detalhada = pd.DataFrame(tabela_detalhada)
+            st.dataframe(df_table_detalhada, use_container_width=True)
+        else:
+            st.warning("Dados não disponíveis")
+    
+    with tab2:
+        col_comp1, col_comp2 = st.columns(2)
+        
+        with col_comp1:
+            st.markdown("**Composição Setorial - Comparação lado a lado**")
+            st.caption("Participação de cada setor no Valor Adicionado Bruto - ano {}".format(ano_ref))
+            
+            if not dados_comparacao.empty:
+                # Preparar dados para gráfico empilhado
+                composicoes_munic = []
+                
+                for _, row in dados_comparacao.iterrows():
+                    if row["vab_total"] > 0:
+                        composicoes_munic.append({
+                            "Município": row["nome_municipio"],
+                            "Setor": "Agropecuária",
+                            "Participação (%)": (row["vab_agropecuaria"] / row["vab_total"]) * 100
+                        })
+                        composicoes_munic.append({
+                            "Município": row["nome_municipio"],
+                            "Setor": "Indústria",
+                            "Participação (%)": (row["vab_industria"] / row["vab_total"]) * 100
+                        })
+                        composicoes_munic.append({
+                            "Município": row["nome_municipio"],
+                            "Setor": "Serviços",
+                            "Participação (%)": (row["vab_servicos"] / row["vab_total"]) * 100
+                        })
+                        composicoes_munic.append({
+                            "Município": row["nome_municipio"],
+                            "Setor": "Administração Pública",
+                            "Participação (%)": (row["vab_adm_defesa_educacao_saude"] / row["vab_total"]) * 100
+                        })
+                
+                df_comp_stacked = pd.DataFrame(composicoes_munic)
+                
+                fig_comp_stacked = px.bar(
+                    df_comp_stacked,
+                    x="Município",
+                    y="Participação (%)",
+                    color="Setor",
+                    text_auto='.1f',
+                    color_discrete_map=CORES_SETORES
+                )
+                fig_comp_stacked.update_layout(barmode='stack')
+                st.plotly_chart(fig_comp_stacked, use_container_width=True)
+            else:
+                st.warning("Dados não disponíveis")
+        
+        with col_comp2:
+            st.markdown("**Comparação por setor - Valores absolutos**")
+            st.caption("Valor Adicionado Bruto (VAB) em R$ milhões - ano {}".format(ano_ref))
+            
+            if not dados_comparacao.empty:
+                # Preparar dados para gráfico de barras agrupadas
+                setores_absolutos = []
+                
+                for _, row in dados_comparacao.iterrows():
+                    setores_absolutos.append({
+                        "Município": row["nome_municipio"],
+                        "Agropecuária": row["vab_agropecuaria"] / 1000,
+                        "Indústria": row["vab_industria"] / 1000,
+                        "Serviços": row["vab_servicos"] / 1000,
+                        "Administração Pública": row["vab_adm_defesa_educacao_saude"] / 1000
+                    })
+                
+                df_setores_abs = pd.DataFrame(setores_absolutos)
+                
+                # Transformar para formato long
+                df_setores_long = df_setores_abs.melt(
+                    id_vars=["Município"],
+                    var_name="Setor",
+                    value_name="VAB (R$ mi)"
+                )
+                
+                fig_setores_grouped = px.bar(
+                    df_setores_long,
+                    x="Setor",
+                    y="VAB (R$ mi)",
+                    color="Município",
+                    barmode='group',
+                    text_auto='.1f',
+                    color_discrete_sequence=PALETA_COMPARACAO
+                )
+                st.plotly_chart(fig_setores_grouped, use_container_width=True)
+            else:
+                st.warning("Dados não disponíveis")
 
 # ===============================
 # VISUALIZAÇÕES AGREGADAS (UFs/REGIÕES)
