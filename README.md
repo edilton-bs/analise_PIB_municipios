@@ -2,6 +2,8 @@
 
 Dashboard interativo desenvolvido em Streamlit para análise econômica dos municípios brasileiros com dados do IBGE (2010-2023).
 
+Link do app: [https://pib-dos-municipios.streamlit.app/](https://pib-dos-municipios.streamlit.app/)
+
 ## Como executar
 
 ```bash
