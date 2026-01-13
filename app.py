@@ -102,9 +102,12 @@ uf = st.sidebar.selectbox(
 # MODO DE VISUALIZAÇÃO E SELEÇÃO DE MUNICÍPIOS
 # ===============================
 
-# Seleção de modo de visualização a depender da UF
+# Seleção de modo de visualização a depender da UF e região
 if uf == "Todas":
-    modos_disponiveis = ["Agregado", "Município específico", "Comparar municípios"]
+    if regiao == "Brasil":
+        modos_disponiveis = ["Agregado", "Comparar Regiões", "Comparar Estados", "Município específico", "Comparar municípios"]
+    else:
+        modos_disponiveis = ["Agregado", "Comparar Estados", "Município específico", "Comparar municípios"]
 else:
     modos_disponiveis = ["Todos os municípios", "Município específico", "Comparar municípios"]
 modo = st.sidebar.radio(
@@ -116,8 +119,44 @@ modo = st.sidebar.radio(
 municipios = []
 municipios_sel = []
 municipios_sel_dict = {}  # Para armazenar município -> UF
+ufs_sel = []  # Para armazenar UFs selecionadas
+regioes_sel = []  # Para armazenar regiões selecionadas
 
-if modo == "Município específico":
+if modo == "Comparar Regiões":
+    # Obter lista de regiões
+    regioes_disponiveis = ["Norte", "Nordeste", "Sudeste", "Sul", "Centro-oeste"]
+    st.sidebar.markdown("**Regiões do Brasil**")
+    
+    regioes_sel = st.sidebar.multiselect(
+        "Selecione Regiões para comparação",
+        regioes_disponiveis,
+        default=regioes_disponiveis[:2] if len(regioes_disponiveis) >= 2 else []
+    )
+    
+    if regioes_sel:
+        st.sidebar.caption(f"{len(regioes_sel)} região(ões) selecionada(s)")
+
+elif modo == "Comparar Estados":
+    # Obter lista de UFs baseada na região
+    if regiao == "Brasil":
+        ufs_disponiveis = obter_lista_ufs(df, None)
+        st.sidebar.markdown("**Estados do Brasil**")
+        default_count = min(3, len(ufs_disponiveis))
+    else:
+        ufs_disponiveis = obter_lista_ufs(df, regiao)
+        st.sidebar.markdown(f"**Estados da região {regiao}**")
+        default_count = min(2, len(ufs_disponiveis))
+    
+    ufs_sel = st.sidebar.multiselect(
+        "Selecione Estados para comparação",
+        ufs_disponiveis,
+        default=ufs_disponiveis[:default_count] if default_count > 0 else []
+    )
+    
+    if ufs_sel:
+        st.sidebar.caption(f"{len(ufs_sel)} estado(s) selecionado(s)")
+
+elif modo == "Município específico":
     # Obter lista de municípios baseado na seleção de região/UF
     if uf != "Todas":
         municipios = obter_lista_municipios(df, uf)
@@ -286,6 +325,89 @@ elif modo == "Comparar municípios" and municipios_sel and len(municipios_sel) >
     else:
         st.warning("Dados não disponíveis para os municípios selecionados.")
 
+elif modo == "Comparar Estados" and ufs_sel and len(ufs_sel) > 0:
+    # Determinar título baseado na região
+    if regiao == "Brasil":
+        titulo_kpi = f"📌 Comparação entre Estados ({len(ufs_sel)} UFs)"
+    else:
+        titulo_kpi = f"📌 Comparação entre Estados da região {regiao}"
+    
+    st.subheader(titulo_kpi)
+    
+    # Calcular KPIs agregados das UFs selecionadas
+    dados_selecionados = df[(df["sigla_uf"].isin(ufs_sel)) & (df["ano"] == ano_ref)]
+    
+    if not dados_selecionados.empty:
+        col1, col2, col3, col4 = st.columns(4)
+        
+        pib_total = dados_selecionados["pib_total"].sum()
+        populacao_total = (dados_selecionados["pib_total"] / dados_selecionados["pib_per_capita"]).sum() * 1000
+        pib_per_capita_medio = pib_total / (populacao_total / 1000) if populacao_total > 0 else 0
+        num_municipios = dados_selecionados["nome_municipio"].nunique()
+        
+        col1.metric(
+            f"PIB Total agregado ({ano_ref})",
+            formatar_valor(pib_total)
+        )
+        
+        col2.metric(
+            f"População total ({ano_ref})",
+            f"{int(populacao_total):,}".replace(",", ".")
+        )
+        
+        col3.metric(
+            f"PIB per capita médio ({ano_ref})",
+            f"R$ {pib_per_capita_medio:,.0f}".replace(",", ".")
+        )
+        
+        col4.metric(
+            "Total de municípios",
+            f"{num_municipios}"
+        )
+    else:
+        st.warning("Dados não disponíveis para os estados selecionados.")
+
+elif modo == "Comparar Regiões" and regioes_sel and len(regioes_sel) > 0:
+    st.subheader(f"📌 Comparação entre Regiões ({len(regioes_sel)} regiões)")
+    
+    # Calcular KPIs agregados das regiões selecionadas
+    dados_selecionados = df[(df["nome_grande_regiao"].isin(regioes_sel)) & (df["ano"] == ano_ref)]
+    
+    if not dados_selecionados.empty:
+        col1, col2, col3, col4, col5 = st.columns(5)
+        
+        pib_total = dados_selecionados["pib_total"].sum()
+        populacao_total = (dados_selecionados["pib_total"] / dados_selecionados["pib_per_capita"]).sum() * 1000
+        pib_per_capita_medio = pib_total / (populacao_total / 1000) if populacao_total > 0 else 0
+        num_municipios = dados_selecionados["nome_municipio"].nunique()
+        
+        col1.metric(
+            f"PIB Total agregado ({ano_ref})",
+            formatar_valor(pib_total)
+        )
+        
+        col2.metric(
+            f"População total ({ano_ref})",
+            f"{int(populacao_total):,}".replace(",", ".")
+        )
+        
+        col3.metric(
+            f"PIB per capita médio ({ano_ref})",
+            f"R$ {pib_per_capita_medio:,.0f}".replace(",", ".")
+        )
+
+        col4.metric(
+            "Total de UFs",
+            f"{dados_selecionados['sigla_uf'].nunique()}"
+        )
+        
+        col5.metric(
+            "Total de municípios",
+            f"{num_municipios}"
+        )
+    else:
+        st.warning("Dados não disponíveis para as regiões selecionadas.")
+
 elif modo == "Todos os municípios":
     st.subheader(f"📌 Indicadores-chave - {uf} (Todos os municípios)")
     
@@ -401,9 +523,73 @@ col5, col6 = st.columns(2)
 
 with col5:
     st.markdown(f"**Evolução do PIB ao longo do tempo ({ano_intervalo[0]}–{ano_intervalo[1]})**")
-    st.caption(f"Visualizando apenas os top 5 maiores PIBs em {ano_intervalo[1]} para clareza")
     
-    if modo == "Município específico":
+    if modo == "Comparar Regiões":
+        st.caption(f"Comparação da evolução econômica entre {len(regioes_sel)} regiões")
+        
+        if regioes_sel and len(regioes_sel) > 0:
+            # Dados agregados por região
+            df_filtrado = df[
+                (df["nome_grande_regiao"].isin(regioes_sel)) &
+                (df["ano"] >= ano_intervalo[0]) &
+                (df["ano"] <= ano_intervalo[1])
+            ]
+            
+            df_line = df_filtrado.groupby(["ano", "nome_grande_regiao"]).agg(
+                pib_total=("pib_total", "sum")
+            ).reset_index()
+            
+            if not df_line.empty:
+                df_line["PIB (R$ bi)"] = df_line["pib_total"] / 1_000_000
+                
+                fig_line = px.line(
+                    df_line,
+                    x="ano",
+                    y="PIB (R$ bi)",
+                    color="nome_grande_regiao",
+                    markers=True,
+                    color_discrete_sequence=PALETA_COMPARACAO
+                )
+                fig_line.update_layout(xaxis_title="Ano", yaxis_title="PIB (R$ bi)", legend_title="Região")
+            else:
+                fig_line = px.line(title="Dados não disponíveis")
+        else:
+            fig_line = px.line(title="Selecione regiões para comparar")
+    
+    elif modo == "Comparar Estados":
+        st.caption(f"Comparação da evolução econômica entre {len(ufs_sel)} estados")
+        
+        if ufs_sel and len(ufs_sel) > 0:
+            # Dados agregados por UF
+            df_filtrado = df[
+                (df["sigla_uf"].isin(ufs_sel)) &
+                (df["ano"] >= ano_intervalo[0]) &
+                (df["ano"] <= ano_intervalo[1])
+            ]
+            
+            df_line = df_filtrado.groupby(["ano", "sigla_uf"]).agg(
+                pib_total=("pib_total", "sum")
+            ).reset_index()
+            
+            if not df_line.empty:
+                df_line["PIB (R$ bi)"] = df_line["pib_total"] / 1_000_000
+                
+                fig_line = px.line(
+                    df_line,
+                    x="ano",
+                    y="PIB (R$ bi)",
+                    color="sigla_uf",
+                    markers=True,
+                    color_discrete_sequence=PALETA_COMPARACAO
+                )
+                fig_line.update_layout(xaxis_title="Ano", yaxis_title="PIB (R$ bi)", legend_title="UF")
+            else:
+                fig_line = px.line(title="Dados não disponíveis")
+        else:
+            fig_line = px.line(title="Selecione estados para comparar")
+    
+    elif modo == "Município específico":
+        st.caption(f"Visualizando apenas os top 5 maiores PIBs em {ano_intervalo[1]} para clareza")
         # Obter UF do município
         uf_municipio = df[df["nome_municipio"] == municipio_sel]["sigla_uf"].iloc[0]
         
@@ -541,7 +727,47 @@ with col6:
     else:
         st.caption(f"Evolução do valor adicionado ao longo do tempo considerando todos os municípios")
     
-    if modo == "Município específico":
+    if modo == "Comparar Regiões" and regioes_sel and len(regioes_sel) > 0:
+        # Filtrar pelas regiões selecionadas E pelo intervalo de anos
+        df_temp = df[
+            (df["nome_grande_regiao"].isin(regioes_sel)) &
+            (df["ano"] >= ano_intervalo[0]) &
+            (df["ano"] <= ano_fim_vab)
+        ]
+        
+        df_area = df_temp.groupby("ano").agg({
+            "vab_agropecuaria": "sum",
+            "vab_industria": "sum",
+            "vab_servicos": "sum",
+            "vab_adm_defesa_educacao_saude": "sum"
+        }).reset_index()
+        df_area = df_area.rename(columns={
+            "vab_agropecuaria": "Agropecuária",
+            "vab_industria": "Indústria",
+            "vab_servicos": "Serviços",
+            "vab_adm_defesa_educacao_saude": "Administração Pública"
+        })
+    elif modo == "Comparar Estados" and ufs_sel and len(ufs_sel) > 0:
+        # Filtrar pelos estados selecionados E pelo intervalo de anos
+        df_temp = df[
+            (df["sigla_uf"].isin(ufs_sel)) &
+            (df["ano"] >= ano_intervalo[0]) &
+            (df["ano"] <= ano_fim_vab)
+        ]
+        
+        df_area = df_temp.groupby("ano").agg({
+            "vab_agropecuaria": "sum",
+            "vab_industria": "sum",
+            "vab_servicos": "sum",
+            "vab_adm_defesa_educacao_saude": "sum"
+        }).reset_index()
+        df_area = df_area.rename(columns={
+            "vab_agropecuaria": "Agropecuária",
+            "vab_industria": "Indústria",
+            "vab_servicos": "Serviços",
+            "vab_adm_defesa_educacao_saude": "Administração Pública"
+        })
+    elif modo == "Município específico":
         df_area = dados_evolucao_valor_adicionado(
             df,
             municipio=municipio_sel,
@@ -730,6 +956,187 @@ if modo == "Todos os municípios":
             st.warning("Dados de ranking não disponíveis")
     
     # Distribuição e análise
+    # st.markdown("--REGIÕES
+# ===============================
+if modo == "Comparar Regiões" and regioes_sel and len(regioes_sel) > 1:
+    st.markdown("---")
+    st.subheader("🗺️ Comparação Detalhada entre Regiões")
+    st.caption(f"Análise comparativa de {len(regioes_sel)} regiões brasileiras")
+    
+    ano_ref_comp = min(ano_ref, 2021)
+    
+    col_reg1, col_reg2 = st.columns(2)
+    
+    # Obter dados agregados por região
+    dados_regioes = df[(df["nome_grande_regiao"].isin(regioes_sel)) & (df["ano"] == ano_ref)].groupby("nome_grande_regiao").agg({
+        "pib_total": "sum",
+        "pib_per_capita": "mean"
+    }).reset_index()
+    
+    with col_reg1:
+        st.markdown(f"**PIB Total por Região - {ano_ref}**")
+        if not dados_regioes.empty:
+            dados_regioes["PIB Total (R$ bi)"] = dados_regioes["pib_total"] / 1_000_000
+            
+            fig_bar_reg = px.bar(
+                dados_regioes,
+                x="nome_grande_regiao",
+                y="PIB Total (R$ bi)",
+                text_auto='.1f',
+                labels={"nome_grande_regiao": "Região"}
+            )
+            st.plotly_chart(fig_bar_reg, use_container_width=True)
+        else:
+            st.warning("Dados não disponíveis")
+    
+    with col_reg2:
+        st.markdown(f"**PIB per capita médio - {ano_ref}**")
+        if not dados_regioes.empty:
+            fig_bar_pc_reg = px.bar(
+                dados_regioes,
+                x="nome_grande_regiao",
+                y="pib_per_capita",
+                text_auto='.0f',
+                labels={"nome_grande_regiao": "Região", "pib_per_capita": "PIB per capita (R$)"},
+                color="pib_per_capita",
+                color_continuous_scale="RdYlGn"
+            )
+            st.plotly_chart(fig_bar_pc_reg, use_container_width=True)
+        else:
+            st.warning("Dados não disponíveis")
+    
+    # Tabs para análises detalhadas
+    st.markdown("---")
+    tab1, tab2 = st.tabs(["📋 Tabela Comparativa", "🧩 Estrutura Setorial"])
+    
+    with tab1:
+        st.markdown("**Indicadores Consolidados por Região**")
+        st.caption(f"Dados referentes ao ano {ano_ref_comp}")
+        
+        # Criar tabela detalhada
+        tabela_regioes = []
+        dados_ano = df[(df["nome_grande_regiao"].isin(regioes_sel)) & (df["ano"] == ano_ref_comp)]
+        
+        for regiao_item in regioes_sel:
+            dados_regiao = dados_ano[dados_ano["nome_grande_regiao"] == regiao_item]
+            
+            if not dados_regiao.empty:
+                pib = dados_regiao["pib_total"].sum()
+                pop = (dados_regiao["pib_total"] / dados_regiao["pib_per_capita"]).sum() * 1000
+                ppc = pib / (pop / 1000) if pop > 0 else 0
+                n_mun = dados_regiao["nome_municipio"].nunique()
+                n_ufs = dados_regiao["sigla_uf"].nunique()
+                
+                # Calcular crescimento
+                dados_ini = df[(df["nome_grande_regiao"] == regiao_item) & (df["ano"] == ano_intervalo[0])]["pib_total"].sum()
+                dados_fim = df[(df["nome_grande_regiao"] == regiao_item) & (df["ano"] == ano_intervalo[1])]["pib_total"].sum()
+                crescimento = ((dados_fim - dados_ini) / dados_ini) * 100 if dados_ini > 0 else None
+                
+                # Composição setorial
+                vab_total = dados_regiao["vab_total"].sum()
+                if vab_total > 0:
+                    agro = (dados_regiao["vab_agropecuaria"].sum() / vab_total) * 100
+                    ind = (dados_regiao["vab_industria"].sum() / vab_total) * 100
+                    serv = (dados_regiao["vab_servicos"].sum() / vab_total) * 100
+                    adm = (dados_regiao["vab_adm_defesa_educacao_saude"].sum() / vab_total) * 100
+                else:
+                    agro = ind = serv = adm = 0
+                
+                tabela_regioes.append({
+                    "Região": regiao_item,
+                    "Nº UFs": n_ufs,
+                    "Nº Municípios": n_mun,
+                    "População": f"{int(pop):,}".replace(",", "."),
+                    "PIB Total (R$ bi)": f"{pib / 1_000_000:.1f}",
+                    "PIB per capita (R$)": f"{ppc:,.0f}".replace(",", "."),
+                    f"Crescimento {ano_intervalo[0]}–{ano_intervalo[1]}": f"{crescimento:.1f}%" if crescimento else "N/A",
+                    "Agropecuária (%)": f"{agro:.1f}",
+                    "Indústria (%)": f"{ind:.1f}",
+                    "Serviços (%)": f"{serv:.1f}",
+                    "Adm. Pública (%)": f"{adm:.1f}"
+                })
+        
+        if tabela_regioes:
+            df_tab_regioes = pd.DataFrame(tabela_regioes)
+            st.dataframe(df_tab_regioes, use_container_width=True)
+        else:
+            st.warning("Dados não disponíveis")
+    
+    with tab2:
+        col_set1, col_set2 = st.columns(2)
+        
+        with col_set1:
+            st.markdown("**Composição Setorial Comparada**")
+            st.caption(f"Participação dos setores no VAB - {ano_ref_comp}")
+            
+            composicoes = []
+            for regiao_item in regioes_sel:
+                comp = composicao_setorial_agregado(df, regiao_item, ano_ref_comp)
+                if comp is not None and not comp.empty:
+                    comp["Região"] = regiao_item
+                    composicoes.append(comp)
+            
+            if composicoes:
+                df_comp = pd.concat(composicoes, ignore_index=True)
+                
+                fig_comp = px.bar(
+                    df_comp,
+                    x="Região",
+                    y="Participação (%)",
+                    color="Setor",
+                    text_auto='.1f',
+                    color_discrete_map=CORES_SETORES
+                )
+                fig_comp.update_layout(barmode='stack')
+                st.plotly_chart(fig_comp, use_container_width=True)
+            else:
+                st.warning("Dados não disponíveis")
+        
+        with col_set2:
+            st.markdown("**Valores Absolutos por Setor**")
+            st.caption(f"VAB em R$ bilhões - {ano_ref_comp}")
+            
+            dados_setores = df[(df["nome_grande_regiao"].isin(regioes_sel)) & (df["ano"] == ano_ref_comp)].groupby("nome_grande_regiao").agg({
+                "vab_agropecuaria": "sum",
+                "vab_industria": "sum",
+                "vab_servicos": "sum",
+                "vab_adm_defesa_educacao_saude": "sum"
+            }).reset_index()
+            
+            if not dados_setores.empty:
+                # Converter para bilhões e formato long
+                dados_setores["Agropecuária"] = dados_setores["vab_agropecuaria"] / 1_000_000
+                dados_setores["Indústria"] = dados_setores["vab_industria"] / 1_000_000
+                dados_setores["Serviços"] = dados_setores["vab_servicos"] / 1_000_000
+                dados_setores["Administração Pública"] = dados_setores["vab_adm_defesa_educacao_saude"] / 1_000_000
+                
+                df_long = dados_setores.melt(
+                    id_vars=["nome_grande_regiao"],
+                    value_vars=["Agropecuária", "Indústria", "Serviços", "Administração Pública"],
+                    var_name="Setor",
+                    value_name="VAB (R$ bi)"
+                )
+                
+                fig_abs = px.bar(
+                    df_long,
+                    x="Setor",
+                    y="VAB (R$ bi)",
+                    color="nome_grande_regiao",
+                    barmode='group',
+                    text_auto='.1f',
+                    color_discrete_sequence=PALETA_COMPARACAO,
+                    labels={"nome_grande_regiao": "Região"}
+                )
+                st.plotly_chart(fig_abs, use_container_width=True)
+            else:
+                st.warning("Dados não disponíveis")
+
+# ===============================
+# COMPARAÇÃO ENTRE ESTADOS - Continuação da análise de "Todos os municípios"
+# ===============================
+
+# Esta seção pertence ao modo "Todos os municípios" da UF
+if modo == "Todos os municípios":
     st.markdown("---")
     col_dist1, col_dist2 = st.columns(2)
     
@@ -780,6 +1187,182 @@ if modo == "Todos os municípios":
     else:
         st.warning("Tabela detalhada não disponível")
 
+
+# ===============================
+# COMPARAÇÃO ENTRE ESTADOS
+# ===============================
+if modo == "Comparar Estados" and ufs_sel and len(ufs_sel) > 1:
+    st.markdown("---")
+    st.subheader("🗺️ Comparação Detalhada entre Estados")
+    
+    if regiao == "Brasil":
+        st.caption(f"Análise comparativa de {len(ufs_sel)} estados brasileiros")
+    else:
+        st.caption(f"Análise comparativa de {len(ufs_sel)} estados da região {regiao}")
+    
+    ano_ref_comp = min(ano_ref, 2021)
+    
+    col_est1, col_est2 = st.columns(2)
+    
+    # Obter dados agregados por UF
+    dados_ufs = df[(df["sigla_uf"].isin(ufs_sel)) & (df["ano"] == ano_ref)].groupby("sigla_uf").agg({
+        "pib_total": "sum",
+        "pib_per_capita": "mean"
+    }).reset_index()
+    
+    with col_est1:
+        st.markdown(f"**PIB Total por Estado - {ano_ref}**")
+        if not dados_ufs.empty:
+            dados_ufs["PIB Total (R$ bi)"] = dados_ufs["pib_total"] / 1_000_000
+            
+            fig_bar_ufs = px.bar(
+                dados_ufs,
+                x="sigla_uf",
+                y="PIB Total (R$ bi)",
+                text_auto='.1f',
+                labels={"sigla_uf": "Estado"}
+            )
+            st.plotly_chart(fig_bar_ufs, use_container_width=True)
+        else:
+            st.warning("Dados não disponíveis")
+    
+    with col_est2:
+        st.markdown(f"**PIB per capita médio - {ano_ref}**")
+        if not dados_ufs.empty:
+            fig_bar_pc_ufs = px.bar(
+                dados_ufs,
+                x="sigla_uf",
+                y="pib_per_capita",
+                text_auto='.0f',
+                labels={"sigla_uf": "Estado", "pib_per_capita": "PIB per capita (R$)"},
+                color="pib_per_capita",
+                color_continuous_scale="RdYlGn"
+            )
+            st.plotly_chart(fig_bar_pc_ufs, use_container_width=True)
+        else:
+            st.warning("Dados não disponíveis")
+    
+    # Tabs para análises detalhadas
+    st.markdown("---")
+    tab1, tab2 = st.tabs(["📋 Tabela Comparativa", "🧩 Estrutura Setorial"])
+    
+    with tab1:
+        st.markdown("**Indicadores Consolidados por Estado**")
+        st.caption(f"Dados referentes ao ano {ano_ref_comp}")
+        
+        # Criar tabela detalhada
+        tabela_ufs = []
+        dados_ano = df[(df["sigla_uf"].isin(ufs_sel)) & (df["ano"] == ano_ref_comp)]
+        
+        for uf_item in ufs_sel:
+            dados_uf = dados_ano[dados_ano["sigla_uf"] == uf_item]
+            
+            if not dados_uf.empty:
+                pib = dados_uf["pib_total"].sum()
+                pop = (dados_uf["pib_total"] / dados_uf["pib_per_capita"]).sum() * 1000
+                ppc = pib / (pop / 1000) if pop > 0 else 0
+                n_mun = dados_uf["nome_municipio"].nunique()
+                
+                # Calcular crescimento
+                crescimento = calcular_crescimento_periodo(df, uf_item, "sigla_uf", ano_intervalo[0], ano_intervalo[1])
+                
+                # Composição setorial
+                vab_total = dados_uf["vab_total"].sum()
+                if vab_total > 0:
+                    agro = (dados_uf["vab_agropecuaria"].sum() / vab_total) * 100
+                    ind = (dados_uf["vab_industria"].sum() / vab_total) * 100
+                    serv = (dados_uf["vab_servicos"].sum() / vab_total) * 100
+                    adm = (dados_uf["vab_adm_defesa_educacao_saude"].sum() / vab_total) * 100
+                else:
+                    agro = ind = serv = adm = 0
+                
+                tabela_ufs.append({
+                    "UF": uf_item,
+                    "Nº Municípios": n_mun,
+                    "População": f"{int(pop):,}".replace(",", "."),
+                    "PIB Total (R$ bi)": f"{pib / 1_000_000:.1f}",
+                    "PIB per capita (R$)": f"{ppc:,.0f}".replace(",", "."),
+                    f"Crescimento {ano_intervalo[0]}–{ano_intervalo[1]}": f"{crescimento:.1f}%" if crescimento else "N/A",
+                    "Agropecuária (%)": f"{agro:.1f}",
+                    "Indústria (%)": f"{ind:.1f}",
+                    "Serviços (%)": f"{serv:.1f}",
+                    "Adm. Pública (%)": f"{adm:.1f}"
+                })
+        
+        if tabela_ufs:
+            df_tab_ufs = pd.DataFrame(tabela_ufs)
+            st.dataframe(df_tab_ufs, use_container_width=True)
+        else:
+            st.warning("Dados não disponíveis")
+    
+    with tab2:
+        col_set1, col_set2 = st.columns(2)
+        
+        with col_set1:
+            st.markdown("**Composição Setorial Comparada**")
+            st.caption(f"Participação dos setores no VAB - {ano_ref_comp}")
+            
+            composicoes = []
+            for uf_item in ufs_sel:
+                comp = composicao_setorial_uf(df, uf_item, ano_ref_comp)
+                if comp is not None and not comp.empty:
+                    comp["UF"] = uf_item
+                    composicoes.append(comp)
+            
+            if composicoes:
+                df_comp = pd.concat(composicoes, ignore_index=True)
+                
+                fig_comp = px.bar(
+                    df_comp,
+                    x="UF",
+                    y="Participação (%)",
+                    color="Setor",
+                    text_auto='.1f',
+                    color_discrete_map=CORES_SETORES
+                )
+                fig_comp.update_layout(barmode='stack')
+                st.plotly_chart(fig_comp, use_container_width=True)
+            else:
+                st.warning("Dados não disponíveis")
+        
+        with col_set2:
+            st.markdown("**Valores Absolutos por Setor**")
+            st.caption(f"VAB em R$ bilhões - {ano_ref_comp}")
+            
+            dados_setores = df[(df["sigla_uf"].isin(ufs_sel)) & (df["ano"] == ano_ref_comp)].groupby("sigla_uf").agg({
+                "vab_agropecuaria": "sum",
+                "vab_industria": "sum",
+                "vab_servicos": "sum",
+                "vab_adm_defesa_educacao_saude": "sum"
+            }).reset_index()
+            
+            if not dados_setores.empty:
+                # Converter para bilhões e formato long
+                dados_setores["Agropecuária"] = dados_setores["vab_agropecuaria"] / 1_000_000
+                dados_setores["Indústria"] = dados_setores["vab_industria"] / 1_000_000
+                dados_setores["Serviços"] = dados_setores["vab_servicos"] / 1_000_000
+                dados_setores["Administração Pública"] = dados_setores["vab_adm_defesa_educacao_saude"] / 1_000_000
+                
+                df_long = dados_setores.melt(
+                    id_vars=["sigla_uf"],
+                    value_vars=["Agropecuária", "Indústria", "Serviços", "Administração Pública"],
+                    var_name="Setor",
+                    value_name="VAB (R$ bi)"
+                )
+                
+                fig_abs = px.bar(
+                    df_long,
+                    x="Setor",
+                    y="VAB (R$ bi)",
+                    color="sigla_uf",
+                    barmode='group',
+                    text_auto='.1f',
+                    color_discrete_sequence=PALETA_COMPARACAO,
+                    labels={"sigla_uf": "Estado"}
+                )
+                st.plotly_chart(fig_abs, use_container_width=True)
+            else:
+                st.warning("Dados não disponíveis")
 
 # ===============================
 # COMPARAÇÃO ENTRE MUNICÍPIOS

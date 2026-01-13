@@ -31,4 +31,4 @@
     - Se Região for uma região específica (ex: Sudeste), a comparação pode ser apenas entre municípios daquela região
     - Na verdade permitir o modo de visualização mesmo que UF não seja selecionada
 
-- Rever: Estrutura do Valor Adicionado (2010–2021)
+- Rever: Estrutura do Valor Adicionado (2010–2021) [ok]
