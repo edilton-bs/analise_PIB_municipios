@@ -682,17 +682,26 @@ def tabela_municipios_completa(df, uf, ano, ano_ini):
             crescimento_map[municipio] = ((pib_fim - pib_ini) / pib_ini) * 100
     
     dados_ano["Crescimento"] = dados_ano["nome_municipio"].map(crescimento_map)
-    dados_ano["Dependência Pública (%)"] = (dados_ano["vab_adm_defesa_educacao_saude"] / dados_ano["vab_total"]) * 100
     dados_ano["População"] = ((dados_ano["pib_total"] / dados_ano["pib_per_capita"]) * 1000).astype(int)
     dados_ano["PIB Total (R$ mi)"] = dados_ano["pib_total"] / 1000
     
+    # Calcular percentuais setoriais
+    dados_ano["Agropecuária (%)"] = (dados_ano["vab_agropecuaria"] / dados_ano["vab_total"]) * 100
+    dados_ano["Indústria (%)"] = (dados_ano["vab_industria"] / dados_ano["vab_total"]) * 100
+    dados_ano["Serviços (%)"] = (dados_ano["vab_servicos"] / dados_ano["vab_total"]) * 100
+    dados_ano["Adm. Pública (%)"] = (dados_ano["vab_adm_defesa_educacao_saude"] / dados_ano["vab_total"]) * 100
+    
     tabela = dados_ano[[
-        "nome_municipio", "PIB Total (R$ mi)", "pib_per_capita", 
-        "Dependência Pública (%)", "Crescimento", "atividade_maior_vab", "População"
+        "nome_municipio", "População", "PIB Total (R$ mi)", "pib_per_capita",
+        "Agropecuária (%)", "Indústria (%)", "Serviços (%)", "Adm. Pública (%)",
+        "Crescimento", "atividade_maior_vab"
     ]].copy()
     
     tabela["Crescimento"] = tabela["Crescimento"].apply(lambda x: f"{x:.1f}%" if pd.notna(x) else "N/A")
-    tabela["Dependência Pública (%)"] = tabela["Dependência Pública (%)"].round(1)
+    tabela["Agropecuária (%)"] = tabela["Agropecuária (%)"].round(1)
+    tabela["Indústria (%)"] = tabela["Indústria (%)"].round(1)
+    tabela["Serviços (%)"] = tabela["Serviços (%)"].round(1)
+    tabela["Adm. Pública (%)"] = tabela["Adm. Pública (%)"].round(1)
     
     tabela = tabela.rename(columns={
         "nome_municipio": "Município",
@@ -727,9 +736,14 @@ def tabela_ufs_completa(df, ano, ano_ini, regiao=None):
     # Agregar por UF
     tabela = dados_ano.groupby("sigla_uf").apply(
         lambda x: pd.Series({
+            "Nº Municípios": x["nome_municipio"].nunique(),
+            "População": int((x["pib_total"].sum() / (x["pib_total"] / x["pib_per_capita"]).sum()) * 1000),
             "PIB Total (R$ bi)": x["pib_total"].sum() / 1_000_000,
             "PIB per capita (R$)": x["pib_total"].sum() / ((x["pib_total"] / x["pib_per_capita"]).sum()),
-            "Nº Municípios": x["nome_municipio"].nunique(),
+            "Agropecuária (%)": (x["vab_agropecuaria"].sum() / x["vab_total"].sum()) * 100 if x["vab_total"].sum() > 0 else 0,
+            "Indústria (%)": (x["vab_industria"].sum() / x["vab_total"].sum()) * 100 if x["vab_total"].sum() > 0 else 0,
+            "Serviços (%)": (x["vab_servicos"].sum() / x["vab_total"].sum()) * 100 if x["vab_total"].sum() > 0 else 0,
+            "Adm. Pública (%)": (x["vab_adm_defesa_educacao_saude"].sum() / x["vab_total"].sum()) * 100 if x["vab_total"].sum() > 0 else 0,
             "Setor Dominante": x.groupby("atividade_maior_vab")["pib_total"].sum().idxmax()
         })
     ).reset_index()
@@ -744,6 +758,11 @@ def tabela_ufs_completa(df, ano, ano_ini, regiao=None):
     
     tabela["Crescimento"] = tabela["sigla_uf"].map(crescimento_map)
     tabela["Crescimento"] = tabela["Crescimento"].apply(lambda x: f"{x:.1f}%" if pd.notna(x) else "N/A")
+    tabela["Agropecuária (%)"] = tabela["Agropecuária (%)"].round(1)
+    tabela["Indústria (%)"] = tabela["Indústria (%)"].round(1)
+    tabela["Serviços (%)"] = tabela["Serviços (%)"].round(1)
+    tabela["Adm. Pública (%)"] = tabela["Adm. Pública (%)"].round(1)
+    tabela["População"] = tabela["População"].apply(lambda x: f"{int(x):,}".replace(",", "."))
     
     tabela = tabela.rename(columns={
         "sigla_uf": "UF",
