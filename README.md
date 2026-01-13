@@ -37,13 +37,13 @@ streamlit run app.py
 └── README.md       # Este arquivo
 ```
 
-## 📦 Dependências
+## Dependências
 
 - `streamlit`
 - `pandas`
 - `plotly`
 
-## 📌 Fonte dos Dados
+## Fonte dos Dados
 
 Dados oficiais do IBGE sobre PIB dos municípios brasileiros (2010-2023).
 
