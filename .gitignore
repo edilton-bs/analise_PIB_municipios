@@ -1,2 +1,7 @@
-# ignorar arquivos md
-*.md
+# ignorar arquivos vscode
+.vscode/
+# ignorar arquivos pycharm
+.idea/
+# ignorar arquivos python
+__pycache__/
+*.pyc
