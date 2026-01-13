@@ -102,27 +102,79 @@ uf = st.sidebar.selectbox(
 # MODO DE VISUALIZAÇÃO E SELEÇÃO DE MUNICÍPIOS
 # ===============================
 
-# Determinar modo de visualização baseado na seleção de UF
-if uf != "Todas" and len(uf) == 2:  # UF específica
-    modo = st.sidebar.radio(
-        "Modo de visualização",
-        ["Todos os municípios", "Município específico", "Comparar municípios"]
+# Seleção de modo de visualização a depender da UF
+if uf == "Todas":
+    modos_disponiveis = ["Agregado", "Município específico", "Comparar municípios"]
+else:
+    modos_disponiveis = ["Todos os municípios", "Município específico", "Comparar municípios"]
+modo = st.sidebar.radio(
+    "Modo de visualização",
+    modos_disponiveis
+)
+
+# Variáveis de seleção
+municipios = []
+municipios_sel = []
+municipios_sel_dict = {}  # Para armazenar município -> UF
+
+if modo == "Município específico":
+    # Obter lista de municípios baseado na seleção de região/UF
+    if uf != "Todas":
+        municipios = obter_lista_municipios(df, uf)
+        st.sidebar.markdown(f"**Município de {uf}**")
+    elif regiao != "Brasil":
+        # Municípios da região
+        municipios = df[df["nome_grande_regiao"] == regiao]["nome_municipio"].unique()
+        municipios = sorted(municipios.tolist())
+        st.sidebar.markdown(f"**Município da região {regiao}**")
+    else:
+        # Todos os municípios do Brasil
+        municipios = df["nome_municipio"].unique()
+        municipios = sorted(municipios.tolist())
+        st.sidebar.markdown(f"**Município do Brasil**")
+    
+    municipio_sel = st.sidebar.selectbox("Selecione o município", municipios)
+
+elif modo == "Comparar municípios":
+    # Obter lista de municípios baseado na seleção de região/UF
+    if uf != "Todas":
+        municipios = obter_lista_municipios(df, uf)
+        st.sidebar.markdown(f"**Municípios de {uf}**")
+        default_count = min(2, len(municipios))
+    elif regiao != "Brasil":
+        # Municípios da região
+        municipios = df[df["nome_grande_regiao"] == regiao]["nome_municipio"].unique()
+        municipios = sorted(municipios.tolist())
+        st.sidebar.markdown(f"**Municípios da região {regiao}**")
+        default_count = min(3, len(municipios))
+    else:
+        # Todos os municípios do Brasil
+        municipios = df["nome_municipio"].unique()
+        municipios = sorted(municipios.tolist())
+        st.sidebar.markdown(f"**Municípios do Brasil**")
+        default_count = 0  # Não selecionar nenhum por padrão quando é Brasil inteiro
+    
+    municipios_sel = st.sidebar.multiselect(
+        "Selecione municípios para comparação",
+        municipios,
+        default=municipios[:default_count] if default_count > 0 else []
     )
     
-    # Obter lista de municípios da UF selecionada
-    municipios = obter_lista_municipios(df, uf)
-    
-    if modo == "Município específico":
-        municipio_sel = st.sidebar.selectbox("Município", municipios)
-    elif modo == "Comparar municípios":
-        municipios_sel = st.sidebar.multiselect(
-            "Municípios para comparação",
-            municipios,
-            default=municipios[:min(2, len(municipios))]
-        )
-else:  # Todas as UFs ou região
-    modo = "Agregado"
-    municipios = []
+    if municipios_sel:
+        st.sidebar.caption(f"{len(municipios_sel)} município(s) selecionado(s)")
+        # Criar dicionário município -> UF
+        for mun in municipios_sel:
+            uf_mun = df[df["nome_municipio"] == mun]["sigla_uf"].iloc[0]
+            municipios_sel_dict[mun] = uf_mun
+
+elif modo == "Todos os municípios":
+    # Validação: só funciona se uma UF específica estiver selecionada
+    if uf == "Todas":
+        st.sidebar.warning("⚠️ Selecione uma UF específica para este modo")
+        modo = "Agregado"  # Fallback para modo agregado
+    else:
+        municipios = obter_lista_municipios(df, uf)
+        st.sidebar.markdown(f"**Analisando {len(municipios)} municípios de {uf}**")
 
 
 st.sidebar.markdown("---")
@@ -141,7 +193,9 @@ st.caption("Análise econômica municipal • 2010–2023")
 # ===============================
 
 if modo == "Município específico":
-    st.subheader(f"📌 Indicadores-chave - {municipio_sel}")
+    # Obter UF do município selecionado
+    uf_municipio = df[df["nome_municipio"] == municipio_sel]["sigla_uf"].iloc[0]
+    st.subheader(f"📌 Indicadores-chave - {municipio_sel} ({uf_municipio})")
     
     # Calcular KPIs usando data.py
     kpis = calcular_kpis_municipio(df, municipio_sel, ano_ref)
@@ -184,6 +238,53 @@ if modo == "Município específico":
         )
     else:
         st.warning("Dados não disponíveis para o município selecionado.")
+
+elif modo == "Comparar municípios" and municipios_sel and len(municipios_sel) > 0:
+    # Determinar quantas UFs/regiões diferentes estão sendo comparadas
+    ufs_selecionadas = df[df["nome_municipio"].isin(municipios_sel)]["sigla_uf"].unique()
+    
+    if len(ufs_selecionadas) == 1:
+        titulo_kpi = f"📌 Comparação entre municípios de {ufs_selecionadas[0]}"
+    elif uf != "Todas":
+        titulo_kpi = f"📌 Comparação entre municípios de {uf}"
+    elif regiao != "Brasil":
+        titulo_kpi = f"📌 Comparação entre municípios da região {regiao}"
+    else:
+        titulo_kpi = f"📌 Comparação entre municípios ({len(ufs_selecionadas)} UFs)"
+    
+    st.subheader(titulo_kpi)
+    
+    # Calcular KPIs agregados dos municípios selecionados
+    dados_selecionados = df[(df["nome_municipio"].isin(municipios_sel)) & (df["ano"] == ano_ref)]
+    
+    if not dados_selecionados.empty:
+        col1, col2, col3, col4 = st.columns(4)
+        
+        pib_total = dados_selecionados["pib_total"].sum()
+        populacao_total = (dados_selecionados["pib_total"] / dados_selecionados["pib_per_capita"]).sum() * 1000
+        pib_per_capita_medio = pib_total / (populacao_total / 1000) if populacao_total > 0 else 0
+        
+        col1.metric(
+            f"PIB Total agregado ({ano_ref})",
+            formatar_valor(pib_total)
+        )
+        
+        col2.metric(
+            f"População total ({ano_ref})",
+            f"{int(populacao_total):,}".replace(",", ".")
+        )
+        
+        col3.metric(
+            f"PIB per capita médio ({ano_ref})",
+            f"R$ {pib_per_capita_medio:,.0f}".replace(",", ".")
+        )
+        
+        col4.metric(
+            "Municípios selecionados",
+            f"{len(municipios_sel)}"
+        )
+    else:
+        st.warning("Dados não disponíveis para os municípios selecionados.")
 
 elif modo == "Todos os municípios":
     st.subheader(f"📌 Indicadores-chave - {uf} (Todos os municípios)")
@@ -292,7 +393,7 @@ elif modo == "Agregado":
 # ===============================
 st.markdown("---")
 st.subheader("📊 Evolução Econômica")
-st.caption("Variação do PIB ao longo do tempo, ajustada ao nível de agregação selecionado")
+# st.caption("Variação do PIB ao longo do tempo, ajustada ao nível de agregação selecionado")
 
 
 col5, col6 = st.columns(2)
@@ -300,11 +401,15 @@ col5, col6 = st.columns(2)
 
 with col5:
     st.markdown(f"**Evolução do PIB ao longo do tempo ({ano_intervalo[0]}–{ano_intervalo[1]})**")
+    st.caption(f"Visualizando apenas os top 5 maiores PIBs em {ano_intervalo[1]} para clareza")
     
     if modo == "Município específico":
+        # Obter UF do município
+        uf_municipio = df[df["nome_municipio"] == municipio_sel]["sigla_uf"].iloc[0]
+        
         df_line = dados_evolucao_pib(
             df, 
-            uf=uf,
+            uf=uf_municipio,
             municipios=[municipio_sel],
             ano_ini=ano_intervalo[0],
             ano_fim=ano_intervalo[1]
@@ -326,13 +431,33 @@ with col5:
         
     elif modo == "Comparar municípios":
         if municipios_sel and len(municipios_sel) > 0:
-            df_line = dados_evolucao_pib(
-                df,
-                uf=uf,
-                municipios=municipios_sel,
-                ano_ini=ano_intervalo[0],
-                ano_fim=ano_intervalo[1]
-            )
+            # Filtrar municípios com base na região/UF selecionada
+            if uf != "Todas":
+                df_line = dados_evolucao_pib(
+                    df,
+                    uf=uf,
+                    municipios=municipios_sel,
+                    ano_ini=ano_intervalo[0],
+                    ano_fim=ano_intervalo[1]
+                )
+            elif regiao != "Brasil":
+                df_line = dados_evolucao_pib(
+                    df,
+                    regiao=regiao,
+                    municipios=municipios_sel,
+                    ano_ini=ano_intervalo[0],
+                    ano_fim=ano_intervalo[1]
+                )
+            else:
+                # Brasil inteiro - filtrar apenas pelos municípios
+                df_filtrado = df[
+                    (df["nome_municipio"].isin(municipios_sel)) &
+                    (df["ano"] >= ano_intervalo[0]) &
+                    (df["ano"] <= ano_intervalo[1])
+                ]
+                df_line = df_filtrado.groupby(["ano", "nome_municipio"]).agg(
+                    pib_total=("pib_total", "sum")
+                ).reset_index()
             
             if not df_line.empty:
                 df_line["PIB (R$ mi)"] = df_line["pib_total"] / 1000
@@ -369,7 +494,7 @@ with col5:
                 y="PIB (R$ mi)",
                 color="nome_municipio",
                 markers=True,
-                title=f"Top 5 municípios por PIB",
+                title=None,
                 color_discrete_sequence=PALETA_COMPARACAO
             )
             fig_line.update_layout(xaxis_title="Ano", yaxis_title="PIB (R$ mi)", legend_title="Município")
@@ -411,6 +536,10 @@ with col6:
 
 
     st.markdown(f"**Estrutura do Valor Adicionado ({ano_intervalo[0]}–{ano_fim_vab})**")
+    if uf == "Todas":
+        st.caption(f"Evolução do valor adicionado ao longo do tempo considerando todos as UFs da região")
+    else:
+        st.caption(f"Evolução do valor adicionado ao longo do tempo considerando todos os municípios")
     
     if modo == "Município específico":
         df_area = dados_evolucao_valor_adicionado(
@@ -420,14 +549,19 @@ with col6:
             ano_fim=ano_intervalo[1]
         )
     elif modo == "Comparar municípios" and municipios_sel and len(municipios_sel) > 0:
-
         # Filtrar pelos municípios selecionados E pelo intervalo de anos
         df_temp = df[
-            (df["sigla_uf"] == uf) & 
             (df["nome_municipio"].isin(municipios_sel)) &
             (df["ano"] >= ano_intervalo[0]) &
             (df["ano"] <= ano_fim_vab)
         ]
+        
+        # Se região específica foi selecionada, aplicar filtro adicional
+        if regiao != "Brasil":
+            df_temp = df_temp[df_temp["nome_grande_regiao"] == regiao]
+        if uf != "Todas":
+            df_temp = df_temp[df_temp["sigla_uf"] == uf]
+        
         df_area = df_temp.groupby("ano").agg({
             "vab_agropecuaria": "sum",
             "vab_industria": "sum",
@@ -479,15 +613,14 @@ with col6:
 # COMPOSIÇÃO DO PIB (ANO REF)
 # ===============================
 if modo == "Município específico":
-
     # ano_ref no máximo 2021
     ano_ref = min(ano_ref, 2021)
-
+    
+    # Obter UF do município
+    uf_municipio = df[df["nome_municipio"] == municipio_sel]["sigla_uf"].iloc[0]
 
     st.markdown("---")
     
-    
-    # col7, col8 = st.columns(2)
     # colunas na proporção 1, 1.5
     col7, col8 = st.columns([1, 1.5])
     
@@ -513,11 +646,11 @@ if modo == "Município específico":
     with col8:
         st.markdown("### 🧠 Escala econômica vs renda")
         st.caption(
-            "Comparação do município selecionado com outros municípios da mesma UF e com população similar, "
-            "avaliando relação entre tamanho da economia, renda média e dependência pública. Dados de PIB e PIB per capita referentes ao ano de {}.".format(ano_ref)
+            f"Comparação de {municipio_sel} com municípios de {uf_municipio} com população similar. "
+            f"Dados de PIB e PIB per capita referentes ao ano de {ano_ref}."
         )
         
-        df_scatter = scatter_pib_vs_per_capita(df, uf, municipio_sel, ano_ref)
+        df_scatter = scatter_pib_vs_per_capita(df, uf_municipio, municipio_sel, ano_ref)
         
         if df_scatter is not None and not df_scatter.empty:
             # Criar coluna para cor baseada em se é referência
@@ -653,15 +786,34 @@ if modo == "Todos os municípios":
 # ===============================
 if modo == "Comparar municípios" and municipios_sel and len(municipios_sel) > 1:
     st.markdown("---")
+    
+    # Obter UFs dos municípios selecionados
+    ufs_municipios = df[df["nome_municipio"].isin(municipios_sel)]["sigla_uf"].unique()
+    
+    if len(ufs_municipios) == 1:
+        subtitulo = f"Municípios de {ufs_municipios[0]}"
+    elif uf != "Todas":
+        subtitulo = f"Municípios de {uf}"
+    elif regiao != "Brasil":
+        subtitulo = f"Municípios da região {regiao}"
+    else:
+        subtitulo = f"Municípios de {len(ufs_municipios)} estados diferentes"
+    
     st.subheader("🔍 Comparação Direta entre Municípios")
-    st.caption("Análise lado a lado dos municípios selecionados para identificar diferenças e padrões")
+    st.caption(f"{subtitulo} • Análise lado a lado para identificar diferenças e padrões")
 
     ano_ref = min(ano_ref, 2021)
     
     col9, col10 = st.columns(2)
     
-    # Obter dados dos municípios selecionados
-    dados_comparacao = df[(df["sigla_uf"] == uf) & (df["nome_municipio"].isin(municipios_sel)) & (df["ano"] == ano_ref)]
+    # Obter dados dos municípios selecionados (sem filtro de UF, já que pode ser multi-UF)
+    dados_comparacao = df[(df["nome_municipio"].isin(municipios_sel)) & (df["ano"] == ano_ref)]
+    
+    # Aplicar filtro de região se necessário
+    if regiao != "Brasil":
+        dados_comparacao = dados_comparacao[dados_comparacao["nome_grande_regiao"] == regiao]
+    if uf != "Todas":
+        dados_comparacao = dados_comparacao[dados_comparacao["sigla_uf"] == uf]
     
     with col9:
         st.markdown(f"**PIB Total - {ano_ref}**")
@@ -720,7 +872,7 @@ if modo == "Comparar municípios" and municipios_sel and len(municipios_sel) > 1
                 # Dependência pública
                 dependencia = (row["vab_adm_defesa_educacao_saude"] / row["vab_total"]) * 100 if row["vab_total"] > 0 else 0
                 
-                tabela_detalhada.append({
+                item = {
                     "Município": municipio,
                     "População": f"{int(populacao):,}".replace(",", "."),
                     "PIB Total (R$ mi)": f"{row['pib_total'] / 1000:.1f}",
@@ -731,7 +883,13 @@ if modo == "Comparar municípios" and municipios_sel and len(municipios_sel) > 1
                     "Adm. Pública (%)": f"{dependencia:.1f}",
                     f"Crescimento {ano_intervalo[0]}–{ano_fim}": f"{crescimento:.1f}%" if crescimento else "N/A",
                     "Setor Dominante": row["atividade_maior_vab"]
-                })
+                }
+                
+                # Adicionar coluna UF se for comparação multi-UF
+                if len(ufs_municipios) > 1:
+                    item = {"UF": row["sigla_uf"], **item}
+                
+                tabela_detalhada.append(item)
             
             df_table_detalhada = pd.DataFrame(tabela_detalhada)
             st.dataframe(df_table_detalhada, use_container_width=True)
